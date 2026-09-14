@@ -5,6 +5,8 @@ import { DreamPurchaseItem, PRIORITY_TIERS } from '@/lib/types';
 import { PriorityBadge } from '@/components/ui/priority-badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { SafeImage } from '@/components/ui/safe-image';
+import { SmallDreamAffordabilityChip } from '@/components/finance/small-dream-affordability-chip';
+import { formatCurrency } from '@/lib/finance-calculator';
 import { Button } from '@/components/ui/button';
 import {
   Trophy,
@@ -16,11 +18,14 @@ import {
   Pin,
   CheckCircle2,
   Layers,
+  Clock,
 } from 'lucide-react';
 
 interface DreamCardProps {
   dream: DreamPurchaseItem;
   variant?: 'big' | 'small' | 'list';
+  safeToSpend?: number;
+  currency?: string;
   onSelect: (dream: DreamPurchaseItem) => void;
   onEdit: (dream: DreamPurchaseItem) => void;
   onDelete: (dreamId: string) => void;
@@ -31,6 +36,8 @@ interface DreamCardProps {
 export const DreamCard: React.FC<DreamCardProps> = ({
   dream,
   variant = 'big',
+  safeToSpend,
+  currency = 'INR',
   onSelect,
   onEdit,
   onDelete,
@@ -95,16 +102,28 @@ export const DreamCard: React.FC<DreamCardProps> = ({
             </h4>
           </div>
 
-          {/* Price & Progress */}
+          {/* Price & Affordability */}
           <div className="pt-1 border-t border-white/5 space-y-1.5">
             <div className="flex items-baseline justify-between">
               <span className="text-xs text-slate-400">Target</span>
               <span className="text-base font-extrabold text-amber-300 font-mono">
-                ${finalPrice.toLocaleString()}
+                {formatCurrency(finalPrice, currency)}
               </span>
             </div>
 
-            {!isPurchased && (
+            {/* Affordability Badge for Small Dreams */}
+            {!isPurchased && safeToSpend !== undefined && (
+              <div className="pt-0.5">
+                <SmallDreamAffordabilityChip
+                  price={finalPrice}
+                  safeToSpend={safeToSpend}
+                  currency={currency}
+                  size="sm"
+                />
+              </div>
+            )}
+
+            {!isPurchased && safeToSpend === undefined && (
               <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-amber-500 to-emerald-400 rounded-full"
@@ -225,18 +244,18 @@ export const DreamCard: React.FC<DreamCardProps> = ({
           )}
         </div>
 
-        {/* Financial Progress Box */}
+        {/* Financial Progress Box (Big Dream Finance) */}
         <div className="p-4 rounded-2xl bg-[#0a0d16]/80 border border-white/5 space-y-2.5">
           <div className="flex items-baseline justify-between">
-            <span className="text-xs font-medium text-slate-400">Target Value</span>
+            <span className="text-xs font-medium text-slate-400">Target Goal</span>
             <div className="flex items-baseline gap-2">
               {dream.listedPrice > finalPrice && (
                 <span className="text-xs text-slate-500 line-through">
-                  ${dream.listedPrice.toLocaleString()}
+                  {formatCurrency(dream.listedPrice, currency)}
                 </span>
               )}
               <span className="text-xl font-extrabold text-amber-300 font-mono tracking-tight">
-                ${finalPrice.toLocaleString()}
+                {formatCurrency(finalPrice, currency)}
               </span>
             </div>
           </div>
@@ -244,7 +263,7 @@ export const DreamCard: React.FC<DreamCardProps> = ({
           {!isPurchased && (
             <div className="space-y-1.5">
               <div className="flex justify-between text-[11px] text-slate-400 font-mono">
-                <span>Saved: ${amountSaved.toLocaleString()}</span>
+                <span>Funded: {formatCurrency(amountSaved, currency)}</span>
                 <span>{progressPercent}% Complete</span>
               </div>
               <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
@@ -252,6 +271,14 @@ export const DreamCard: React.FC<DreamCardProps> = ({
                   className="h-full bg-gradient-to-r from-amber-500 via-yellow-400 to-emerald-400 rounded-full transition-all duration-500"
                   style={{ width: `${progressPercent}%` }}
                 />
+              </div>
+              <div className="flex justify-between text-[10px] text-slate-500 font-mono pt-0.5">
+                <span>Remaining: {formatCurrency(Math.max(0, finalPrice - amountSaved), currency)}</span>
+                {dream.monthlyContribution ? (
+                  <span className="text-purple-300 font-medium">
+                    +{formatCurrency(dream.monthlyContribution, currency)}/mo allocation
+                  </span>
+                ) : null}
               </div>
             </div>
           )}

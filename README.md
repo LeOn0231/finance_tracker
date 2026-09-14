@@ -8,7 +8,7 @@ Inspired primarily by **Black Clover** (Grimoire tiers, Magic Knight ranks, Blac
 
 ---
 
-## 🚀 Features (Phases 1 & 2)
+## 🚀 Features (Phases 1, 2 & 3)
 
 ### 1. Single-User Private Application & Authentication
 - **Strict Privacy**: Single-admin architecture. No public registration.
@@ -29,16 +29,26 @@ Inspired primarily by **Black Clover** (Grimoire tiers, Magic Knight ranks, Blac
   - `Dreaming` → `Planning` → `Saving` → `Ready to Buy` → `Purchased`
 - **Web Audio Sound Effects**: Zero external audio assets needed. Built-in Web Audio API synthesizer generates retro fanfare chimes, click haptics, and victory fanfare.
 
-### 3. Comprehensive Dream Tracker
-- **Main Dashboard**: Real-time stats (Total Dreams, Big Dreams, Small Dreams, Purchased, Total Dream Value, Purchased Value, Remaining Goal Value).
+### 3. Comprehensive Dream Purchase Tracker
+- **Main Dashboard**: Real-time stats (Total Dreams, Big Dreams, Small Dreams, Purchased, Total Dream Value, Purchased Value, Remaining Goal Value) + compact **THIS MONTH** financial card.
 - **Featured Current Quest**: Hero card with live funding progress bar, glowing aura, and quick actions.
 - **Big Dreams Page**: Dedicated gallery with rich visual cards, specifications, and multi-filters.
-- **Small Dreams Page**: Compact grid for figures, manga, audio gear, and gaming accessories.
+- **Small Dreams Page**: Compact grid for figures, manga, audio gear, and gaming accessories with live **Safe-To-Spend Affordability Indicators**.
 - **Item Dossier Modal**: Full specifications, price breakdowns, original date, journey duration, and "View Source" outbound links.
 - **"I Bought This" Celebration**: Confirmation flow triggering golden anime confetti bursts, glowing aura banner, victory fanfare chime, and recording in the **Hall of Fame**.
 - **Purchased Page**: Chronological history tracking total acquisition investment and time-from-dream-to-reality.
-- **Instant Search & Filtering**: Real-time client & server filtering by keyword, priority tier, status, category, and price/date sorting.
-- **Anime-Themed Empty States**: Evocative artwork and inspirational quotes.
+
+### 4. Personal Finance & Monthly Budget System (Phase 3)
+- **Financial Framework Formula**:
+  $$\text{Available Money} = \text{Total Income} - \text{Fixed Expenses} - \text{Savings Target} - \text{Actual Additional Spending}$$
+  $$\text{Safe To Spend} = \text{Available Money} - \text{Safety Buffer}$$
+- **Monthly Income Streams**: Support for Salary, Freelance, Bonuses, Investment yields, and multiple income sources.
+- **Fixed Monthly Commitments**: Recurring bills (Rent/EMI, Food, Electricity, Internet, Mobile, Insurance, Subscriptions) with paid/unpaid toggles and custom categories.
+- **Savings Allocation**: Partitioning monthly savings into specific Big Dream funds (e.g. *Royal Enfield Meteor Fund*) or emergency reserves.
+- **Actual Spending Ledger**: Transaction log with categories, dates, and optional dream linking.
+- **Small Dream Affordability Engine**: Live checking against Safe-To-Spend with 🟢 **AFFORDABLE** or 🔴 **ABOVE CURRENT SAFE-TO-SPEND** badges.
+- **Monthly Dream Purchase Budget**: Optional dedicated dream allocation quota separate from overall safe-to-spend.
+- **Multi-Month History & Reviews**: Complete independent monthly ledger records (September 2026, October 2026, etc.), Month-End review with savings rate, and lightweight CSS/SVG trend charts (1m, 3m, 6m, 12m, all).
 
 ---
 
@@ -91,10 +101,3 @@ Open **http://localhost:3000** in your browser.
 
 - **Username / Email**: `admin` or `admin@lifequest.local`
 - **Password**: `ChangeMeQuest2025!`
-
----
-
-## 📐 Next Phases Roadmap
-
-- **Phase 3**: Precision financial tracking (`Income − Fixed − Savings − Spending = Available − Buffer = Safe to Spend`).
-- **Phase 4**: Long-term quest trees, achievement badge unlocks, and price scraping automations.

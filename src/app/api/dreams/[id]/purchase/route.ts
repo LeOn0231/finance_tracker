@@ -8,6 +8,7 @@ const purchaseActionSchema = z.object({
   finalPrice: z.number().min(0).optional(),
   purchaseDate: z.string().optional(),
   notes: z.string().optional(),
+  recordInSpending: z.boolean().default(true),
 });
 
 interface RouteParams {
@@ -38,35 +39,75 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { action, finalPrice, purchaseDate, notes } = result.data;
+    const { action, finalPrice, purchaseDate, notes, recordInSpending } = result.data;
 
     if (action === 'PURCHASE') {
       const actualPaid = finalPrice !== undefined ? finalPrice : dream.finalPrice;
       const boughtDate = purchaseDate ? new Date(purchaseDate) : new Date();
 
-      const [updatedDream, transaction] = await db.$transaction([
-        db.dreamPurchase.update({
-          where: { id },
+      const month = boughtDate.getMonth() + 1;
+      const year = boughtDate.getFullYear();
+
+      // Find or create current financial month
+      let financialMonth = await db.financialMonth.findUnique({
+        where: { month_year: { month, year } },
+      });
+
+      if (!financialMonth) {
+        financialMonth = await db.financialMonth.create({
           data: {
-            status: 'PURCHASED',
-            finalPrice: actualPaid,
-            amountSaved: actualPaid,
-            datePurchased: boughtDate,
-            isCurrentQuest: false,
-            notes: notes ? `${dream.notes ? `${dream.notes}\n` : ''}[Purchased]: ${notes}` : dream.notes,
+            month,
+            year,
+            savingsTarget: 1500,
+            safetyBuffer: 800,
+            dreamBudget: 500,
+            currency: 'INR',
           },
-        }),
-        db.purchaseTransaction.create({
+        });
+      }
+
+      const updatedDream = await db.dreamPurchase.update({
+        where: { id },
+        data: {
+          status: 'PURCHASED',
+          finalPrice: actualPaid,
+          amountSaved: actualPaid,
+          datePurchased: boughtDate,
+          isCurrentQuest: false,
+          notes: notes ? `${dream.notes ? `${dream.notes}\n` : ''}[Purchased]: ${notes}` : dream.notes,
+        },
+      });
+
+      // Record in purchase transaction log
+      const transaction = await db.purchaseTransaction.create({
+        data: {
+          date: boughtDate,
+          description: `Acquired: ${dream.name}`,
+          category: dream.category,
+          amount: actualPaid,
+          linkedDreamId: id,
+          financialMonthId: financialMonth.id,
+          notes: notes || 'Quest completed and verified.',
+        },
+      });
+
+      // If requested, record in monthly spending ledger
+      if (recordInSpending) {
+        await db.expense.create({
           data: {
-            date: boughtDate,
-            description: `Acquired: ${dream.name}`,
+            financialMonthId: financialMonth.id,
+            description: `[Dream Acquisition] ${dream.name}`,
             category: dream.category,
             amount: actualPaid,
+            type: 'ADDITIONAL_SPENDING',
+            isRecurring: false,
+            isPaid: true,
             linkedDreamId: id,
-            notes: notes || 'Quest completed and verified.',
+            notes: notes || 'Dream purchase deducted from safe-to-spend.',
+            date: boughtDate,
           },
-        }),
-      ]);
+        });
+      }
 
       return NextResponse.json({
         success: true,
@@ -84,9 +125,13 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         },
       });
 
-      // Remove any linked transaction
+      // Remove linked transactions and spending records
       await db.purchaseTransaction.deleteMany({
         where: { linkedDreamId: id },
+      });
+
+      await db.expense.deleteMany({
+        where: { linkedDreamId: id, type: 'ADDITIONAL_SPENDING' },
       });
 
       return NextResponse.json({

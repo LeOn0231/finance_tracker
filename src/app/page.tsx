@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { AppShell } from '@/components/layout/app-shell';
-import { DreamPurchaseItem, DashboardStats, PriorityTier, PRIORITY_TIERS } from '@/lib/types';
+import { DreamPurchaseItem, DashboardStats } from '@/lib/types';
 import { PriorityBadge } from '@/components/ui/priority-badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { SafeImage } from '@/components/ui/safe-image';
@@ -13,6 +13,7 @@ import { DreamDetailModal } from '@/components/dreams/dream-detail-modal';
 import { PurchaseModal } from '@/components/dreams/purchase-modal';
 import { CelebrationOverlay } from '@/components/celebration/celebration-overlay';
 import { EmptyState } from '@/components/ui/empty-state';
+import { formatCurrency, MONTH_NAMES } from '@/lib/finance-calculator';
 import Link from 'next/link';
 import {
   Sparkles,
@@ -28,7 +29,11 @@ import {
   Shield,
   Layers,
   CheckCircle2,
-  ExternalLink,
+  Lock,
+  PiggyBank,
+  ShoppingBag,
+  Zap,
+  ArrowRight,
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -123,12 +128,13 @@ export default function DashboardPage() {
     }
   };
 
-  // Handle Confirm Purchase (triggers celebration)
+  // Handle Confirm Purchase
   const handleConfirmPurchase = async (
     dreamId: string,
     finalPrice: number,
     purchaseDate: string,
-    notes?: string
+    notes?: string,
+    recordInSpending: boolean = true
   ) => {
     const res = await fetch(`/api/dreams/${dreamId}/purchase`, {
       method: 'POST',
@@ -138,6 +144,7 @@ export default function DashboardPage() {
         finalPrice,
         purchaseDate,
         notes,
+        recordInSpending,
       }),
     });
 
@@ -160,7 +167,8 @@ export default function DashboardPage() {
       )
     : 0;
 
-  // Active / Non-purchased dreams for recent display
+  const finance = stats?.currentMonthFinance;
+
   const activeDreams = dreams.filter((d) => d.status !== 'PURCHASED');
   const bigDreams = activeDreams.filter((d) => d.type === 'BIG_DREAM');
   const smallDreams = activeDreams.filter((d) => d.type === 'SMALL_DREAM');
@@ -201,9 +209,93 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* COMPACT "THIS MONTH" FINANCE CARD (Requirement #15) */}
+        {finance && (
+          <div className="rounded-3xl bg-gradient-to-br from-[#121929] via-[#0f1422] to-[#0a0d16] border border-emerald-500/30 p-5 sm:p-6 shadow-2xl relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  <Zap className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">
+                    THIS MONTH ({MONTH_NAMES[finance.month - 1]} {finance.year})
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Active Safe-to-Spend cash flow and savings rate summary.
+                  </p>
+                </div>
+              </div>
+
+              <Link
+                href="/money"
+                className="inline-flex items-center gap-1 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+              >
+                <span>Open Money Sanctuary</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            {/* Numbers Row */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 text-xs font-mono">
+              <div className="p-3 rounded-xl bg-[#090c14] border border-white/5">
+                <span className="text-[10px] text-emerald-400 uppercase block font-sans font-bold">Income</span>
+                <span className="font-bold text-slate-200 text-sm">
+                  ${finance.totalIncome.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#090c14] border border-white/5">
+                <span className="text-[10px] text-rose-400 uppercase block font-sans font-bold">Fixed</span>
+                <span className="font-bold text-slate-200 text-sm">
+                  ${finance.fixedExpenses.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#090c14] border border-white/5">
+                <span className="text-[10px] text-purple-400 uppercase block font-sans font-bold">Savings</span>
+                <span className="font-bold text-purple-300 text-sm">
+                  ${finance.savingsTarget.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#090c14] border border-white/5">
+                <span className="text-[10px] text-amber-400 uppercase block font-sans font-bold">Spent</span>
+                <span className="font-bold text-amber-300 text-sm">
+                  ${finance.actualSpending.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#090c14] border border-white/5">
+                <span className="text-[10px] text-slate-400 uppercase block font-sans font-bold">Available</span>
+                <span className="font-bold text-slate-200 text-sm">
+                  ${finance.availableMoney.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#090c14] border border-white/5">
+                <span className="text-[10px] text-sky-400 uppercase block font-sans font-bold">Buffer</span>
+                <span className="font-bold text-sky-300 text-sm">
+                  ${finance.safetyBuffer.toLocaleString()}
+                </span>
+              </div>
+
+              <div className={`p-3 rounded-xl border col-span-2 sm:col-span-1 ${
+                finance.safeToSpend < 0
+                  ? 'bg-rose-500/15 border-rose-500/40 text-rose-300 shadow-glow-crimson'
+                  : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-glow-emerald'
+              }`}>
+                <span className="text-[10px] uppercase block font-sans font-bold">Safe To Spend</span>
+                <span className="font-black text-sm">
+                  ${finance.safeToSpend.toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 7 Key Stats Metrics Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {/* 1. Total Dreams */}
           <div className="p-4 sm:p-5 rounded-2xl bg-[#121624]/90 border border-white/[0.08] shadow-lg flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
               <span className="font-semibold uppercase tracking-wider">Total Dreams</span>
@@ -217,7 +309,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 2. Big Dreams */}
           <Link
             href="/big-dreams"
             className="p-4 sm:p-5 rounded-2xl bg-[#121624]/90 border border-white/[0.08] hover:border-amber-500/40 transition-all hover:bg-surface-elevated shadow-lg flex flex-col justify-between group"
@@ -234,7 +325,6 @@ export default function DashboardPage() {
             </div>
           </Link>
 
-          {/* 3. Small Dreams */}
           <Link
             href="/small-dreams"
             className="p-4 sm:p-5 rounded-2xl bg-[#121624]/90 border border-white/[0.08] hover:border-purple-500/40 transition-all hover:bg-surface-elevated shadow-lg flex flex-col justify-between group"
@@ -251,7 +341,6 @@ export default function DashboardPage() {
             </div>
           </Link>
 
-          {/* 4. Purchased / Hall of Fame */}
           <Link
             href="/purchased"
             className="p-4 sm:p-5 rounded-2xl bg-[#121624]/90 border border-white/[0.08] hover:border-teal-500/40 transition-all hover:bg-surface-elevated shadow-lg flex flex-col justify-between group"
@@ -268,7 +357,6 @@ export default function DashboardPage() {
             </div>
           </Link>
 
-          {/* 5. Total Dream Value */}
           <div className="p-4 sm:p-5 rounded-2xl bg-[#101422] border border-white/[0.08] shadow-lg flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
               <span className="font-semibold uppercase tracking-wider">Total Dream Value</span>
@@ -279,7 +367,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 6. Purchased Value */}
           <div className="p-4 sm:p-5 rounded-2xl bg-[#101422] border border-white/[0.08] shadow-lg flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
               <span className="font-semibold uppercase tracking-wider text-teal-400/90">Purchased Value</span>
@@ -290,7 +377,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 7. Remaining Value */}
           <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-[#181e35] to-[#101424] border border-amber-500/30 shadow-glow-gold col-span-2 flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs text-amber-300 mb-2">
               <span className="font-bold uppercase tracking-wider">Remaining Quest Value</span>
@@ -320,7 +406,6 @@ export default function DashboardPage() {
 
             <div className="relative rounded-3xl bg-gradient-to-br from-[#161c30] via-[#101424] to-[#0c0f1a] border-2 border-amber-500/50 quest-aura-active p-6 sm:p-8 shadow-2xl overflow-hidden">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-                {/* Image */}
                 <div className="md:col-span-4 relative aspect-[16/10] md:aspect-square rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
                   <SafeImage
                     src={currentQuest.image}
@@ -333,7 +418,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Details */}
                 <div className="md:col-span-8 space-y-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1.5 flex-wrap">
@@ -357,7 +441,6 @@ export default function DashboardPage() {
                     )}
                   </div>
 
-                  {/* Funding Bar */}
                   <div className="p-4 rounded-2xl bg-[#090b12]/90 border border-white/10 space-y-2">
                     <div className="flex items-baseline justify-between">
                       <span className="text-xs text-slate-400">Target Acquisition Value:</span>
@@ -380,7 +463,6 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Actions */}
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                     <div className="flex items-center gap-2">
                       <Button
@@ -545,6 +627,8 @@ export default function DashboardPage() {
         dream={purchasingDream}
         isOpen={Boolean(purchasingDream)}
         onClose={() => setPurchasingDream(null)}
+        safeToSpend={stats?.currentMonthFinance?.safeToSpend || 0}
+        currency="USD"
         onConfirmPurchase={handleConfirmPurchase}
       />
 

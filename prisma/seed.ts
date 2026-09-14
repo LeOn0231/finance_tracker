@@ -5,7 +5,7 @@ import { INITIAL_SAMPLE_DREAMS } from '../src/lib/sample-data';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting Life Quest database seeding...');
+  console.log('🌱 Starting Life Quest database seeding with Phase 3 Finance models...');
 
   // 1. Seed or update Single Admin Account
   const username = process.env.ADMIN_USERNAME || 'admin';
@@ -30,8 +30,6 @@ async function main() {
       },
     });
     console.log(`✅ Admin user created: ${admin.username} (${admin.email})`);
-  } else {
-    console.log(`ℹ️ Admin user already exists: ${existingAdmin.username}`);
   }
 
   // 2. Seed Sample Dream Purchases
@@ -57,44 +55,184 @@ async function main() {
           notes: dream.notes,
           specs: dream.specs,
           isCurrentQuest: dream.isCurrentQuest,
+          monthlyContribution: dream.type === 'BIG_DREAM' ? 250 : 0,
           datePurchased: dream.datePurchased ? new Date(dream.datePurchased) : null,
         },
       });
     }
     console.log(`✅ Created ${INITIAL_SAMPLE_DREAMS.length} starter dream purchases.`);
-  } else {
-    console.log(`ℹ️ Found ${existingDreamsCount} existing dream purchases, skipping dream seed.`);
   }
 
-  // 3. Seed Current Financial Month baseline
+  // 3. Seed Current & Historical Financial Months (July 2026, August 2026, September 2026)
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
 
-  const existingMonth = await prisma.financialMonth.findUnique({
-    where: {
-      month_year: {
-        month: currentMonth,
-        year: currentYear,
-      },
-    },
+  // Find sample bike dream for savings allocation
+  const meteorDream = await prisma.dreamPurchase.findFirst({
+    where: { name: { contains: 'Meteor' } },
   });
 
-  if (!existingMonth) {
-    await prisma.financialMonth.create({
-      data: {
-        month: currentMonth,
-        year: currentYear,
-        income: 5000,
-        savingsTarget: 1500,
-        safetyBuffer: 800,
-        notes: 'Monthly financial baseline configured for Quest progression.',
+  // Helper to seed a financial month
+  async function seedMonth(
+    m: number,
+    y: number,
+    incomesData: { source: string; desc: string; amount: number }[],
+    fixedExpensesData: { desc: string; category: string; amount: number }[],
+    savingsTarget: number,
+    safetyBuffer: number,
+    dreamBudget: number,
+    actualSpendData: { desc: string; category: string; amount: number; date: Date }[],
+    notes: string
+  ) {
+    let monthRecord = await prisma.financialMonth.findUnique({
+      where: {
+        month_year: {
+          month: m,
+          year: y,
+        },
       },
     });
-    console.log(`✅ Seeded financial month: ${currentMonth}/${currentYear}`);
+
+    if (!monthRecord) {
+      monthRecord = await prisma.financialMonth.create({
+        data: {
+          month: m,
+          year: y,
+          savingsTarget,
+          safetyBuffer,
+          dreamBudget,
+          currency: 'USD',
+          notes,
+        },
+      });
+
+      // Incomes
+      for (const inc of incomesData) {
+        await prisma.incomeEntry.create({
+          data: {
+            financialMonthId: monthRecord.id,
+            source: inc.source,
+            description: inc.desc,
+            amount: inc.amount,
+            date: new Date(y, m - 1, 1),
+          },
+        });
+      }
+
+      // Fixed Expenses
+      for (const exp of fixedExpensesData) {
+        await prisma.expense.create({
+          data: {
+            financialMonthId: monthRecord.id,
+            type: 'FIXED',
+            description: exp.desc,
+            category: exp.category,
+            amount: exp.amount,
+            isRecurring: true,
+            isPaid: true,
+            date: new Date(y, m - 1, 5),
+          },
+        });
+      }
+
+      // Actual Additional Spending
+      for (const sp of actualSpendData) {
+        await prisma.expense.create({
+          data: {
+            financialMonthId: monthRecord.id,
+            type: 'ADDITIONAL_SPENDING',
+            description: sp.desc,
+            category: sp.category,
+            amount: sp.amount,
+            isRecurring: false,
+            isPaid: true,
+            date: sp.date,
+          },
+        });
+      }
+
+      // Savings Allocations
+      if (meteorDream) {
+        await prisma.savingsAllocation.create({
+          data: {
+            financialMonthId: monthRecord.id,
+            title: 'Royal Enfield Meteor Fund',
+            amount: Math.round(savingsTarget * 0.6),
+            linkedDreamId: meteorDream.id,
+            notes: 'Allocated toward S-Tier Highway Cruiser.',
+          },
+        });
+      }
+      await prisma.savingsAllocation.create({
+        data: {
+          financialMonthId: monthRecord.id,
+          title: 'General Emergency Cushion',
+          amount: Math.round(savingsTarget * 0.4),
+          notes: 'High-yield rainy day reserve.',
+        },
+      });
+
+      console.log(`✅ Seeded full financial ledger for ${m}/${y}`);
+    }
   }
 
-  console.log('🎉 Database seeding complete!');
+  // Seed current month
+  await seedMonth(
+    currentMonth,
+    currentYear,
+    [
+      { source: 'Salary', desc: 'Primary Tech Engineering Salary', amount: 4800 },
+      { source: 'Freelance', desc: 'Anime UI Client Project', amount: 1200 },
+    ],
+    [
+      { desc: 'Apartment Rent / Mortgage', category: 'Rent/EMI', amount: 1600 },
+      { desc: 'Food & Groceries', category: 'Food', amount: 600 },
+      { desc: 'High-speed Fiber Internet & 5G', category: 'Internet', amount: 120 },
+      { desc: 'Electric & Utilities', category: 'Electricity', amount: 150 },
+      { desc: 'Health & Term Insurance', category: 'Insurance', amount: 200 },
+      { desc: 'Streaming & Software Subscriptions', category: 'Subscriptions', amount: 80 },
+    ],
+    1500, // Savings target
+    800,  // Safety buffer
+    500,  // Monthly Dream purchase budget
+    [
+      { desc: 'Weekend Izakaya Dining', category: 'Dining', amount: 85, date: new Date(currentYear, currentMonth - 1, 4) },
+      { desc: 'Mechanical Keyboard Switches & Lube', category: 'Tech & Hobbies', amount: 65, date: new Date(currentYear, currentMonth - 1, 8) },
+      { desc: 'Artbook Import from Tokyo', category: 'Manga & Books', amount: 45, date: new Date(currentYear, currentMonth - 1, 12) },
+    ],
+    'September Quest: Maintain high savings rate for Super Meteor 650 while allowing small dream rewards.'
+  );
+
+  // Seed previous month (August 2026) for trend charts
+  const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+  const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+  await seedMonth(
+    prevMonth,
+    prevYear,
+    [
+      { source: 'Salary', desc: 'Primary Tech Engineering Salary', amount: 4800 },
+      { source: 'Freelance', desc: 'Design Consulting', amount: 800 },
+    ],
+    [
+      { desc: 'Apartment Rent / Mortgage', category: 'Rent/EMI', amount: 1600 },
+      { desc: 'Food & Groceries', category: 'Food', amount: 580 },
+      { desc: 'High-speed Fiber Internet & 5G', category: 'Internet', amount: 120 },
+      { desc: 'Electric & Utilities', category: 'Electricity', amount: 140 },
+      { desc: 'Health & Term Insurance', category: 'Insurance', amount: 200 },
+      { desc: 'Streaming & Software Subscriptions', category: 'Subscriptions', amount: 80 },
+    ],
+    1400,
+    800,
+    400,
+    [
+      { desc: 'Anime Expo Tickets & Merch', category: 'Events', amount: 180, date: new Date(prevYear, prevMonth - 1, 14) },
+      { desc: 'Specialty Coffee Beans', category: 'Food', amount: 40, date: new Date(prevYear, prevMonth - 1, 20) },
+    ],
+    'August Quest: Solid discipline and achieved savings goals.'
+  );
+
+  console.log('🎉 Finance database seeding complete!');
 }
 
 main()

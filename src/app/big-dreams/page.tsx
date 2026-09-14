@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { AppShell } from '@/components/layout/app-shell';
-import { DreamPurchaseItem, PriorityTier, DREAM_CATEGORIES } from '@/lib/types';
+import { DreamPurchaseItem, DREAM_CATEGORIES } from '@/lib/types';
 import { DreamCard } from '@/components/dreams/dream-card';
 import { AddDreamModal } from '@/components/dreams/add-dream-modal';
 import { DreamDetailModal } from '@/components/dreams/dream-detail-modal';
@@ -11,6 +11,7 @@ import { CelebrationOverlay } from '@/components/celebration/celebration-overlay
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { formatCurrency } from '@/lib/finance-calculator';
 import {
   Crown,
   Search,
@@ -20,10 +21,14 @@ import {
   Grid,
   List,
   Sparkles,
+  Zap,
 } from 'lucide-react';
+import Link from 'next/link';
 
 export default function BigDreamsPage() {
   const [dreams, setDreams] = useState<DreamPurchaseItem[]>([]);
+  const [safeToSpend, setSafeToSpend] = useState<number>(0);
+  const [currency, setCurrency] = useState<string>('INR');
   const [isLoading, setIsLoading] = useState(true);
 
   // Search & Filter States
@@ -32,7 +37,6 @@ export default function BigDreamsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('NOT_PURCHASED');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<string>('recent');
-  const [viewMode, setViewMode] = useState<'grid' | 'large'>('large');
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -41,9 +45,10 @@ export default function BigDreamsPage() {
   const [purchasingDream, setPurchasingDream] = useState<DreamPurchaseItem | null>(null);
   const [celebratingDream, setCelebratingDream] = useState<DreamPurchaseItem | null>(null);
 
-  const fetchDreams = useCallback(async () => {
+  const fetchDreamsAndFinance = useCallback(async () => {
     try {
       setIsLoading(true);
+      const now = new Date();
       const params = new URLSearchParams({
         type: 'BIG_DREAM',
         status: statusFilter,
@@ -53,21 +58,33 @@ export default function BigDreamsPage() {
         sortBy,
       });
 
-      const res = await fetch(`/api/dreams?${params.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
+      const [dreamsRes, financeRes] = await Promise.all([
+        fetch(`/api/dreams?${params.toString()}`),
+        fetch(`/api/finance/month?month=${now.getMonth() + 1}&year=${now.getFullYear()}`),
+      ]);
+
+      if (dreamsRes.ok) {
+        const data = await dreamsRes.json();
         setDreams(data.dreams || []);
       }
+
+      if (financeRes.ok) {
+        const fData = await financeRes.json();
+        if (fData.monthData) {
+          setSafeToSpend(fData.monthData.calculated?.safeToSpend || 0);
+          setCurrency(fData.monthData.currency || 'INR');
+        }
+      }
     } catch (error) {
-      console.error('Failed to fetch big dreams:', error);
+      console.error('Failed to fetch big dreams or finance:', error);
     } finally {
       setIsLoading(false);
     }
   }, [statusFilter, priorityFilter, categoryFilter, searchQuery, sortBy]);
 
   useEffect(() => {
-    fetchDreams();
-  }, [fetchDreams]);
+    fetchDreamsAndFinance();
+  }, [fetchDreamsAndFinance]);
 
   const handleSaveDream = async (data: Partial<DreamPurchaseItem>) => {
     if (editingDream) {
@@ -83,26 +100,27 @@ export default function BigDreamsPage() {
         body: JSON.stringify({ ...data, type: 'BIG_DREAM' }),
       });
     }
-    await fetchDreams();
+    await fetchDreamsAndFinance();
   };
 
   const handleDeleteDream = async (dreamId: string) => {
     if (!confirm('Are you sure you want to delete this Big Dream?')) return;
     await fetch(`/api/dreams/${dreamId}`, { method: 'DELETE' });
     if (selectedDream?.id === dreamId) setSelectedDream(null);
-    await fetchDreams();
+    await fetchDreamsAndFinance();
   };
 
   const handleTogglePin = async (dreamId: string) => {
     await fetch(`/api/dreams/${dreamId}/pin`, { method: 'POST' });
-    await fetchDreams();
+    await fetchDreamsAndFinance();
   };
 
   const handleConfirmPurchase = async (
     dreamId: string,
     finalPrice: number,
     purchaseDate: string,
-    notes?: string
+    notes?: string,
+    recordInSpending: boolean = true
   ) => {
     const res = await fetch(`/api/dreams/${dreamId}/purchase`, {
       method: 'POST',
@@ -112,12 +130,13 @@ export default function BigDreamsPage() {
         finalPrice,
         purchaseDate,
         notes,
+        recordInSpending,
       }),
     });
     if (res.ok) {
       const data = await res.json();
       setCelebratingDream(data.dream);
-      await fetchDreams();
+      await fetchDreamsAndFinance();
     }
   };
 
@@ -138,23 +157,35 @@ export default function BigDreamsPage() {
             </p>
           </div>
 
-          <Button
-            onClick={() => {
-              setEditingDream(null);
-              setIsAddModalOpen(true);
-            }}
-            variant="gold"
-            size="md"
-          >
-            <Plus className="w-4 h-4 mr-1.5" />
-            Inscribe Big Dream
-          </Button>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/money"
+              className="px-3.5 py-1.5 rounded-xl bg-[#121624] border border-emerald-500/30 text-xs flex items-center gap-2 hover:border-emerald-500/60 transition-all shadow-md"
+            >
+              <Zap className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-slate-400">Safe Limit:</span>
+              <span className="font-mono font-bold text-emerald-300">
+                {formatCurrency(safeToSpend, currency)}
+              </span>
+            </Link>
+
+            <Button
+              onClick={() => {
+                setEditingDream(null);
+                setIsAddModalOpen(true);
+              }}
+              variant="gold"
+              size="md"
+            >
+              <Plus className="w-4 h-4 mr-1.5" />
+              Inscribe Big Dream
+            </Button>
+          </div>
         </div>
 
         {/* Filter & Search Bar */}
         <div className="p-4 rounded-2xl bg-[#121624]/90 border border-white/[0.08] shadow-lg space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-            {/* Search */}
             <div className="sm:col-span-4">
               <Input
                 value={searchQuery}
@@ -164,7 +195,6 @@ export default function BigDreamsPage() {
               />
             </div>
 
-            {/* Priority Filter */}
             <div className="sm:col-span-2">
               <select
                 value={priorityFilter}
@@ -180,7 +210,6 @@ export default function BigDreamsPage() {
               </select>
             </div>
 
-            {/* Status Filter */}
             <div className="sm:col-span-2">
               <select
                 value={statusFilter}
@@ -197,7 +226,6 @@ export default function BigDreamsPage() {
               </select>
             </div>
 
-            {/* Category Filter */}
             <div className="sm:col-span-2">
               <select
                 value={categoryFilter}
@@ -213,7 +241,6 @@ export default function BigDreamsPage() {
               </select>
             </div>
 
-            {/* Sort Filter */}
             <div className="sm:col-span-2">
               <select
                 value={sortBy}
@@ -257,6 +284,7 @@ export default function BigDreamsPage() {
                 key={dream.id}
                 dream={dream}
                 variant="big"
+                currency={currency}
                 onSelect={setSelectedDream}
                 onEdit={(d) => {
                   setEditingDream(d);
@@ -304,6 +332,8 @@ export default function BigDreamsPage() {
         dream={purchasingDream}
         isOpen={Boolean(purchasingDream)}
         onClose={() => setPurchasingDream(null)}
+        safeToSpend={safeToSpend}
+        currency={currency}
         onConfirmPurchase={handleConfirmPurchase}
       />
 

@@ -137,6 +137,41 @@ export const DREAM_CATEGORIES = [
 
 export type DreamCategory = typeof DREAM_CATEGORIES[number];
 
+export const FIXED_EXPENSE_CATEGORIES = [
+  'Rent/EMI',
+  'Household',
+  'Food & Groceries',
+  'Electricity',
+  'Internet',
+  'Mobile',
+  'Transportation',
+  'Insurance',
+  'Family',
+  'Subscriptions',
+  'Other',
+] as const;
+
+export const INCOME_SOURCES = [
+  'Salary',
+  'Freelance',
+  'Bonus',
+  'Investment',
+  'Other',
+] as const;
+
+export const SPENDING_CATEGORIES = [
+  'Dining',
+  'Groceries',
+  'Shopping',
+  'Tech & Hobbies',
+  'Manga & Books',
+  'Anime & Merch',
+  'Entertainment',
+  'Travel & Transport',
+  'Personal Care',
+  'Other',
+] as const;
+
 export interface DreamPurchaseItem {
   id: string;
   name: string;
@@ -152,6 +187,8 @@ export interface DreamPurchaseItem {
   priority: PriorityTier;
   status: DreamStatus;
   amountSaved: number;
+  monthlyContribution?: number;
+  targetDate?: string | Date | null;
   notes?: string | null;
   specs?: string | null;
   isCurrentQuest: boolean;
@@ -159,6 +196,107 @@ export interface DreamPurchaseItem {
   datePurchased?: string | Date | null;
   createdAt?: string | Date;
   updatedAt?: string | Date;
+}
+
+// ----------------------------------------------------------------------------
+// PHASE 3: FINANCE SYSTEM DOMAIN TYPES
+// ----------------------------------------------------------------------------
+
+export interface IncomeEntryItem {
+  id: string;
+  date: string | Date;
+  source: string;
+  description: string;
+  amount: number;
+  financialMonthId: string;
+  createdAt?: string | Date;
+}
+
+export interface ExpenseItem {
+  id: string;
+  date: string | Date;
+  description: string;
+  category: string;
+  amount: number;
+  type: 'FIXED' | 'ADDITIONAL_SPENDING';
+  isRecurring: boolean;
+  isPaid: boolean;
+  linkedDreamId?: string | null;
+  financialMonthId?: string | null;
+  notes?: string | null;
+  createdAt?: string | Date;
+}
+
+export interface SavingsAllocationItem {
+  id: string;
+  title: string;
+  amount: number;
+  linkedDreamId?: string | null;
+  financialMonthId: string;
+  notes?: string | null;
+  linkedDream?: DreamPurchaseItem | null;
+  createdAt?: string | Date;
+}
+
+export interface PurchaseTransactionItem {
+  id: string;
+  date: string | Date;
+  description: string;
+  category: string;
+  amount: number;
+  linkedDreamId?: string | null;
+  financialMonthId?: string | null;
+  notes?: string | null;
+  linkedDream?: DreamPurchaseItem | null;
+  createdAt?: string | Date;
+}
+
+export interface FinancialMonthCalculations {
+  totalIncome: number;
+  fixedExpenses: number;
+  savingsTarget: number;
+  savingsAllocated: number;
+  actualSpending: number;
+  dreamSpending: number;
+  availableMoney: number;
+  safetyBuffer: number;
+  safeToSpend: number;
+  savingsRate: number; // percentage
+  dreamBudget: number;
+  dreamBudgetUsed: number;
+  dreamBudgetRemaining: number;
+  isDeficit: boolean;
+}
+
+export interface FinancialMonthData {
+  id: string;
+  month: number;
+  year: number;
+  baseIncome: number;
+  savingsTarget: number;
+  safetyBuffer: number;
+  dreamBudget: number;
+  currency: string;
+  notes?: string | null;
+  incomes: IncomeEntryItem[];
+  expenses: ExpenseItem[];
+  allocations: SavingsAllocationItem[];
+  transactions: PurchaseTransactionItem[];
+  calculated: FinancialMonthCalculations;
+}
+
+export interface MonthSummaryMini {
+  month: number;
+  year: number;
+  totalIncome: number;
+  fixedExpenses: number;
+  savingsTarget: number;
+  actualSpending: number;
+  availableMoney: number;
+  safetyBuffer: number;
+  safeToSpend: number;
+  savingsRate: number;
+  isDeficit: boolean;
 }
 
 export interface DashboardStats {
@@ -170,4 +308,5 @@ export interface DashboardStats {
   purchasedValue: number;
   remainingValue: number;
   currentQuest: DreamPurchaseItem | null;
+  currentMonthFinance?: MonthSummaryMini | null;
 }

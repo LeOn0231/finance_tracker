@@ -9,6 +9,7 @@ import { DreamDetailModal } from '@/components/dreams/dream-detail-modal';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { formatCurrency } from '@/lib/finance-calculator';
 import {
   Trophy,
   Search,
@@ -25,6 +26,7 @@ import Link from 'next/link';
 
 export default function PurchasedPage() {
   const [dreams, setDreams] = useState<DreamPurchaseItem[]>([]);
+  const [currency, setCurrency] = useState<string>('INR');
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
@@ -33,6 +35,7 @@ export default function PurchasedPage() {
   const fetchPurchased = useCallback(async () => {
     try {
       setIsLoading(true);
+      const now = new Date();
       const params = new URLSearchParams({
         status: 'PURCHASED',
         category: categoryFilter,
@@ -40,10 +43,21 @@ export default function PurchasedPage() {
         sortBy: 'purchased_recent',
       });
 
-      const res = await fetch(`/api/dreams?${params.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
+      const [dreamsRes, financeRes] = await Promise.all([
+        fetch(`/api/dreams?${params.toString()}`),
+        fetch(`/api/finance/month?month=${now.getMonth() + 1}&year=${now.getFullYear()}`),
+      ]);
+
+      if (dreamsRes.ok) {
+        const data = await dreamsRes.json();
         setDreams(data.dreams || []);
+      }
+
+      if (financeRes.ok) {
+        const fData = await financeRes.json();
+        if (fData.monthData) {
+          setCurrency(fData.monthData.currency || 'INR');
+        }
       }
     } catch (error) {
       console.error('Failed to load purchased history:', error);
@@ -79,7 +93,6 @@ export default function PurchasedPage() {
     0
   );
 
-  // Compute average days from dream to purchase
   const totalDays = dreams.reduce((acc, item) => {
     if (!item.datePurchased) return acc;
     const added = new Date(item.dateAdded).getTime();
@@ -116,7 +129,7 @@ export default function PurchasedPage() {
                   Total Acquired Value
                 </span>
                 <span className="text-xl sm:text-2xl font-black text-teal-300 font-mono">
-                  ${totalSpent.toLocaleString()}
+                  {formatCurrency(totalSpent, currency)}
                 </span>
               </div>
 
@@ -191,7 +204,6 @@ export default function PurchasedPage() {
                   className="group relative rounded-2xl bg-[#121626]/90 border border-teal-500/20 hover:border-teal-400/60 transition-all duration-300 p-4 sm:p-5 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 cursor-pointer hover:bg-surface-elevated"
                 >
                   <div className="flex items-center gap-4 min-w-0 flex-1">
-                    {/* Image */}
                     <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border-2 border-teal-500/40 flex-shrink-0 relative shadow-glow-emerald">
                       <SafeImage
                         src={dream.image}
@@ -201,7 +213,6 @@ export default function PurchasedPage() {
                       />
                     </div>
 
-                    {/* Meta */}
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <PriorityBadge priority={dream.priority} size="sm" />
@@ -233,14 +244,13 @@ export default function PurchasedPage() {
                     </div>
                   </div>
 
-                  {/* Price & Action */}
                   <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-white/5 gap-2">
                     <div className="text-left sm:text-right">
                       <span className="text-[10px] text-slate-400 uppercase tracking-wider block">
                         Final Acquisition
                       </span>
                       <span className="text-lg sm:text-xl font-black text-teal-300 font-mono">
-                        ${(dream.finalPrice || dream.listedPrice || 0).toLocaleString()}
+                        {formatCurrency(dream.finalPrice || dream.listedPrice || 0, currency)}
                       </span>
                     </div>
 
