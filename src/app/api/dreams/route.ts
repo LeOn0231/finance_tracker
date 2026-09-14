@@ -1,0 +1,149 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { db } from '@/lib/db';
+import { requireAuth } from '@/lib/auth';
+import { Prisma } from '@prisma/client';
+
+const createDreamSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  brand: z.string().optional().nullable(),
+  category: z.string().default('General'),
+  type: z.enum(['BIG_DREAM', 'SMALL_DREAM']).default('BIG_DREAM'),
+  image: z.string().optional().nullable(),
+  sourceUrl: z.string().optional().nullable(),
+  sourceName: z.string().optional().nullable(),
+  listedPrice: z.number().min(0).default(0),
+  finalPrice: z.number().min(0).default(0),
+  currency: z.string().default('USD'),
+  priority: z.enum(['S_TIER', 'A_TIER', 'B_TIER', 'C_TIER', 'D_TIER']).default('A_TIER'),
+  status: z.enum(['DREAMING', 'PLANNING', 'SAVING', 'READY_TO_BUY', 'PURCHASED', 'ARCHIVED']).default('DREAMING'),
+  amountSaved: z.number().min(0).default(0),
+  notes: z.string().optional().nullable(),
+  specs: z.string().optional().nullable(),
+  isCurrentQuest: z.boolean().default(false),
+});
+
+export async function GET(req: NextRequest) {
+  try {
+    const session = await requireAuth(req);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const type = searchParams.get('type');
+    const status = searchParams.get('status');
+    const priority = searchParams.get('priority');
+    const category = searchParams.get('category');
+    const search = searchParams.get('search')?.trim();
+    const sortBy = searchParams.get('sortBy') || 'recent';
+
+    const where: Prisma.DreamPurchaseWhereInput = {};
+
+    if (type && type !== 'ALL') {
+      where.type = type;
+    }
+
+    if (status && status !== 'ALL') {
+      if (status === 'NOT_PURCHASED') {
+        where.status = { not: 'PURCHASED' };
+      } else {
+        where.status = status;
+      }
+    }
+
+    if (priority && priority !== 'ALL') {
+      where.priority = priority;
+    }
+
+    if (category && category !== 'ALL') {
+      where.category = category;
+    }
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search } },
+        { brand: { contains: search } },
+        { category: { contains: search } },
+        { notes: { contains: search } },
+      ];
+    }
+
+    // Sorting logic
+    let orderBy: Prisma.DreamPurchaseOrderByWithRelationInput[] = [{ isCurrentQuest: 'desc' }, { dateAdded: 'desc' }];
+    if (sortBy === 'oldest') {
+      orderBy = [{ dateAdded: 'asc' }];
+    } else if (sortBy === 'price_desc') {
+      orderBy = [{ finalPrice: 'desc' }];
+    } else if (sortBy === 'price_asc') {
+      orderBy = [{ finalPrice: 'asc' }];
+    } else if (sortBy === 'purchased_recent') {
+      orderBy = [{ datePurchased: 'desc' }];
+    }
+
+    const dreams = await db.dreamPurchase.findMany({
+      where,
+      orderBy,
+    });
+
+    return NextResponse.json({ dreams });
+  } catch (error) {
+    console.error('Fetch dreams error:', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const session = await requireAuth(req);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const result = createDreamSchema.safeParse(body);
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error.errors[0]?.message || 'Validation failed' },
+        { status: 400 }
+      );
+    }
+
+    const data = result.data;
+
+    // If marked as current quest, unset any other current quest
+    if (data.isCurrentQuest) {
+      await db.dreamPurchase.updateMany({
+        where: { isCurrentQuest: true },
+        data: { isCurrentQuest: false },
+      });
+    }
+
+    const newDream = await db.dreamPurchase.create({
+      data: {
+        name: data.name,
+        brand: data.brand || null,
+        category: data.category,
+        type: data.type,
+        image: data.image || null,
+        sourceUrl: data.sourceUrl || null,
+        sourceName: data.sourceName || null,
+        listedPrice: data.listedPrice || data.finalPrice,
+        finalPrice: data.finalPrice,
+        currency: data.currency,
+        priority: data.priority,
+        status: data.status,
+        amountSaved: data.amountSaved,
+        notes: data.notes || null,
+        specs: data.specs || null,
+        isCurrentQuest: data.isCurrentQuest,
+      },
+    });
+
+    return NextResponse.json({ dream: newDream }, { status: 201 });
+  } catch (error) {
+    console.error('Create dream error:', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
+}

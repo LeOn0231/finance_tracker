@@ -1,0 +1,134 @@
+// Prisma Schema for Life Quest - Private Personal Quest & Finance Tracker
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 1. Single User Account (Admin Only)
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// 2. Dream Purchase (Big Dreams & Small Dreams)
+model DreamPurchase {
+  id             String                @id @default(cuid())
+  name           String
+  brand          String?
+  category       String                @default("General") // Vehicles, Electronics, Collectibles, Gaming, Fashion, Books/Manga, Audio, Other
+  type           String                @default("BIG_DREAM") // BIG_DREAM, SMALL_DREAM
+  image          String?
+  sourceUrl      String?
+  sourceName     String?
+  listedPrice    Float                 @default(0)
+  finalPrice     Float                 @default(0)
+  currency       String                @default("USD")
+  priority       String                @default("A_TIER") // S_TIER, A_TIER, B_TIER, C_TIER, D_TIER
+  status         String                @default("DREAMING") // DREAMING, PLANNING, SAVING, READY_TO_BUY, PURCHASED, ARCHIVED
+  amountSaved    Float                 @default(0)
+  notes          String?
+  specs          String?               // JSON formatted or plain text specifications
+  isCurrentQuest Boolean               @default(false)
+  dateAdded      DateTime              @default(now())
+  datePurchased  DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  transactions   PurchaseTransaction[]
+  priceHistory   PriceHistory[]
+
+  @@index([type])
+  @@index([status])
+  @@index([priority])
+}
+
+// 3. Price History Tracker (Future Extensibility)
+model PriceHistory {
+  id        String        @id @default(cuid())
+  dreamId   String
+  price     Float
+  currency  String        @default("USD")
+  recordedAt DateTime     @default(now())
+  notes     String?
+  createdAt DateTime      @default(now())
+
+  dream     DreamPurchase @relation(fields: [dreamId], references: [id], onDelete: Cascade)
+
+  @@index([dreamId])
+}
+
+// 4. Financial Month (Income, Savings Target, Safety Buffer)
+model FinancialMonth {
+  id            String    @id @default(cuid())
+  month         Int       // 1 - 12
+  year          Int       // e.g. 2025
+  income        Float     @default(0)
+  savingsTarget Float     @default(0)
+  safetyBuffer  Float     @default(0)
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  expenses      Expense[]
+
+  @@unique([month, year])
+}
+
+// 5. Expense Tracking (Fixed, Recurring, Variable - strictly separate from dream purchases)
+model Expense {
+  id               String          @id @default(cuid())
+  date             DateTime        @default(now())
+  description      String
+  category         String          @default("General")
+  amount           Float           @default(0)
+  type             String          @default("VARIABLE") // FIXED, RECURRING, VARIABLE
+  notes            String?
+  financialMonthId String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  financialMonth   FinancialMonth? @relation(fields: [financialMonthId], references: [id], onDelete: SetNull)
+
+  @@index([type])
+  @@index([financialMonthId])
+}
+
+// 6. Purchase Transaction (Actual completed purchase spending)
+model PurchaseTransaction {
+  id            String         @id @default(cuid())
+  date          DateTime       @default(now())
+  description   String
+  category      String         @default("Dream Purchase")
+  amount        Float          @default(0)
+  linkedDreamId String?
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  linkedDream   DreamPurchase? @relation(fields: [linkedDreamId], references: [id], onDelete: SetNull)
+
+  @@index([linkedDreamId])
+}
+
+// 7. Achievement Model (Future Extensibility)
+model Achievement {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  title       String
+  description String
+  icon        String?
+  category    String    @default("DREAM") // DREAM, FINANCE, SAVINGS, SECRET
+  unlockedAt  DateTime?
+  progress    Float     @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
