@@ -172,10 +172,87 @@ export const SPENDING_CATEGORIES = [
   'Other',
 ] as const;
 
+// ----------------------------------------------------------------------------
+// PHASE 4: PRODUCT RESEARCH & PRICE ENGINE DOMAIN TYPES
+// ----------------------------------------------------------------------------
+
+export type PriceConfidence = 'VERIFIED' | 'ESTIMATED' | 'NEEDS_CONFIRMATION';
+
+export interface ConfidenceInfo {
+  code: PriceConfidence;
+  label: string;
+  sublabel: string;
+  badgeClass: string;
+  dotClass: string;
+  iconName: string;
+}
+
+export const CONFIDENCE_CONFIG: Record<PriceConfidence, ConfidenceInfo> = {
+  VERIFIED: {
+    code: 'VERIFIED',
+    label: 'VERIFIED',
+    sublabel: 'Official Manufacturer / Dealer rate',
+    badgeClass: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 shadow-glow-emerald',
+    dotClass: 'bg-emerald-400 animate-pulse',
+    iconName: 'ShieldCheck',
+  },
+  ESTIMATED: {
+    code: 'ESTIMATED',
+    label: 'ESTIMATED',
+    sublabel: 'Estimated taxes or component breakdown',
+    badgeClass: 'bg-amber-500/15 text-amber-300 border-amber-500/40 shadow-glow-gold',
+    dotClass: 'bg-amber-400',
+    iconName: 'HelpCircle',
+  },
+  NEEDS_CONFIRMATION: {
+    code: 'NEEDS_CONFIRMATION',
+    label: 'NEEDS CONFIRMATION',
+    sublabel: 'Approximate or requires dealer quote',
+    badgeClass: 'bg-rose-500/15 text-rose-300 border-rose-500/40 shadow-glow-rose',
+    dotClass: 'bg-rose-400 animate-ping',
+    iconName: 'AlertCircle',
+  },
+};
+
+export interface PriceComponent {
+  name: string;
+  amount: number;
+  description?: string;
+  isMandatory: boolean;
+}
+
+export interface PriceBreakdown {
+  type: 'STANDARD' | 'VEHICLE_ON_ROAD';
+  currency: string;
+  listedPrice: number; // e.g. MSRP, Ex-Showroom
+  finalPrice: number; // Listed + Taxes + Fees + Mandatory charges
+  components: PriceComponent[];
+  location?: {
+    state: string;
+    city?: string;
+  };
+  notes?: string;
+}
+
+export interface PriceHistoryItem {
+  id: string;
+  dreamId: string;
+  price: number;
+  currency: string;
+  source?: string | null;
+  priceType: 'LISTED' | 'FINAL' | 'ON_ROAD';
+  confidence: PriceConfidence;
+  breakdown?: PriceBreakdown | string | null;
+  recordedAt: string | Date;
+  notes?: string | null;
+}
+
 export interface DreamPurchaseItem {
   id: string;
   name: string;
   brand?: string | null;
+  model?: string | null;
+  variant?: string | null;
   category: string;
   type: DreamType;
   image?: string | null;
@@ -192,6 +269,18 @@ export interface DreamPurchaseItem {
   notes?: string | null;
   specs?: string | null;
   isCurrentQuest: boolean;
+  
+  // Phase 4 Extensions
+  priceConfidence: PriceConfidence;
+  priceBreakdown?: PriceBreakdown | string | null;
+  locationState?: string | null;
+  locationCity?: string | null;
+  isManualOverride: boolean;
+  checkedAt?: string | Date | null;
+  availability?: 'IN_STOCK' | 'OUT_OF_STOCK' | 'PRE_ORDER' | 'UNKNOWN' | string;
+  researchMetadata?: string | null;
+  priceHistory?: PriceHistoryItem[];
+
   dateAdded: string | Date;
   datePurchased?: string | Date | null;
   createdAt?: string | Date;

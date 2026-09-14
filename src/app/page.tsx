@@ -604,6 +604,11 @@ export default function DashboardPage() {
         }}
         onSave={handleSaveDream}
         initialData={editingDream}
+        onOpenExisting={(id) => {
+          setIsAddModalOpen(false);
+          const found = dreams.find((d) => d.id === id);
+          if (found) setSelectedDream(found);
+        }}
       />
 
       <DreamDetailModal
@@ -621,6 +626,7 @@ export default function DashboardPage() {
           setPurchasingDream(d);
         }}
         onTogglePin={handleTogglePin}
+        onDreamUpdated={fetchData}
       />
 
       <PurchaseModal

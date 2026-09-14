@@ -302,6 +302,11 @@ export default function SmallDreamsPage() {
         onSave={handleSaveDream}
         initialData={editingDream}
         defaultType="SMALL_DREAM"
+        onOpenExisting={(id) => {
+          setIsAddModalOpen(false);
+          const found = dreams.find((d) => d.id === id);
+          if (found) setSelectedDream(found);
+        }}
       />
 
       <DreamDetailModal
@@ -318,6 +323,7 @@ export default function SmallDreamsPage() {
           setSelectedDream(null);
           setPurchasingDream(d);
         }}
+        onDreamUpdated={fetchDreamsAndFinance}
       />
 
       <PurchaseModal

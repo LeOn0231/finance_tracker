@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { DreamPurchaseItem, PRIORITY_TIERS } from '@/lib/types';
+import { DreamPurchaseItem, PRIORITY_TIERS, CONFIDENCE_CONFIG, PriceConfidence } from '@/lib/types';
 import { PriorityBadge } from '@/components/ui/priority-badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { SafeImage } from '@/components/ui/safe-image';
@@ -19,6 +19,9 @@ import {
   CheckCircle2,
   Layers,
   Clock,
+  MapPin,
+  ShieldCheck,
+  Edit3,
 } from 'lucide-react';
 
 interface DreamCardProps {
@@ -53,6 +56,13 @@ export const DreamCard: React.FC<DreamCardProps> = ({
   const tierInfo = PRIORITY_TIERS[tierKey];
 
   const addedDate = new Date(dream.dateAdded).toLocaleDateString();
+  const confidence: PriceConfidence = (dream.priceConfidence as PriceConfidence) || 'VERIFIED';
+  const confConfig = CONFIDENCE_CONFIG[confidence] || CONFIDENCE_CONFIG.VERIFIED;
+
+  const isVehicle = dream.category === 'Vehicles' || Boolean(dream.priceBreakdown);
+  const locationText = dream.locationState
+    ? `${dream.locationCity ? `${dream.locationCity}, ` : ''}${dream.locationState}`
+    : undefined;
 
   // 1. SMALL COMPACT CARD VARIANT
   if (variant === 'small') {
@@ -78,7 +88,7 @@ export const DreamCard: React.FC<DreamCardProps> = ({
             <PriorityBadge priority={dream.priority} size="sm" />
           </div>
 
-          <div className="absolute top-2 right-2">
+          <div className="absolute top-2 right-2 flex items-center gap-1">
             <StatusBadge status={dream.status} size="sm" />
           </div>
 
@@ -105,7 +115,12 @@ export const DreamCard: React.FC<DreamCardProps> = ({
           {/* Price & Affordability */}
           <div className="pt-1 border-t border-white/5 space-y-1.5">
             <div className="flex items-baseline justify-between">
-              <span className="text-xs text-slate-400">Target</span>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-slate-400">{isVehicle ? 'On-Road' : 'Target'}</span>
+                <span className={`text-[9px] px-1.5 py-0.2 rounded-full border ${confConfig.badgeClass}`}>
+                  {confConfig.label.charAt(0)}
+                </span>
+              </div>
               <span className="text-base font-extrabold text-amber-300 font-mono">
                 {formatCurrency(finalPrice, currency)}
               </span>
@@ -223,10 +238,22 @@ export const DreamCard: React.FC<DreamCardProps> = ({
       {/* Card Content */}
       <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between space-y-4">
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span className="font-semibold text-amber-400/90 tracking-wider uppercase">
-              {dream.brand || dream.category}
-            </span>
+          <div className="flex items-center justify-between text-xs text-slate-400 flex-wrap gap-1">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-amber-400/90 tracking-wider uppercase">
+                {dream.brand || dream.category}
+              </span>
+              <span className={`text-[10px] px-2 py-0.2 rounded-full font-bold border flex items-center gap-1 ${confConfig.badgeClass}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${confConfig.dotClass}`} />
+                {confConfig.label}
+              </span>
+              {dream.isManualOverride && (
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                  MANUAL
+                </span>
+              )}
+            </div>
+
             <span className="font-mono text-slate-400 flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5 text-slate-500" />
               {addedDate}
@@ -236,6 +263,13 @@ export const DreamCard: React.FC<DreamCardProps> = ({
           <h3 className="text-lg sm:text-xl font-extrabold text-white group-hover:text-amber-300 transition-colors line-clamp-2 leading-snug">
             {dream.name}
           </h3>
+
+          {locationText && (
+            <div className="flex items-center gap-1 text-[11px] text-purple-300">
+              <MapPin className="w-3 h-3 text-purple-400" />
+              <span>{locationText}</span>
+            </div>
+          )}
 
           {dream.specs && (
             <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
@@ -247,7 +281,9 @@ export const DreamCard: React.FC<DreamCardProps> = ({
         {/* Financial Progress Box (Big Dream Finance) */}
         <div className="p-4 rounded-2xl bg-[#0a0d16]/80 border border-white/5 space-y-2.5">
           <div className="flex items-baseline justify-between">
-            <span className="text-xs font-medium text-slate-400">Target Goal</span>
+            <span className="text-xs font-medium text-slate-400">
+              {isVehicle ? 'On-Road Target Goal' : 'Target Goal'}
+            </span>
             <div className="flex items-baseline gap-2">
               {dream.listedPrice > finalPrice && (
                 <span className="text-xs text-slate-500 line-through">

@@ -309,6 +309,11 @@ export default function BigDreamsPage() {
         onSave={handleSaveDream}
         initialData={editingDream}
         defaultType="BIG_DREAM"
+        onOpenExisting={(id) => {
+          setIsAddModalOpen(false);
+          const found = dreams.find((d) => d.id === id);
+          if (found) setSelectedDream(found);
+        }}
       />
 
       <DreamDetailModal
@@ -326,6 +331,7 @@ export default function BigDreamsPage() {
           setPurchasingDream(d);
         }}
         onTogglePin={handleTogglePin}
+        onDreamUpdated={fetchDreamsAndFinance}
       />
 
       <PurchaseModal

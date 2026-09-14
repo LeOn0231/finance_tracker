@@ -7,6 +7,8 @@ import { Prisma } from '@prisma/client';
 const createDreamSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   brand: z.string().optional().nullable(),
+  model: z.string().optional().nullable(),
+  variant: z.string().optional().nullable(),
   category: z.string().default('General'),
   type: z.enum(['BIG_DREAM', 'SMALL_DREAM']).default('BIG_DREAM'),
   image: z.string().optional().nullable(),
@@ -14,13 +16,22 @@ const createDreamSchema = z.object({
   sourceName: z.string().optional().nullable(),
   listedPrice: z.number().min(0).default(0),
   finalPrice: z.number().min(0).default(0),
-  currency: z.string().default('USD'),
+  currency: z.string().default('INR'),
   priority: z.enum(['S_TIER', 'A_TIER', 'B_TIER', 'C_TIER', 'D_TIER']).default('A_TIER'),
   status: z.enum(['DREAMING', 'PLANNING', 'SAVING', 'READY_TO_BUY', 'PURCHASED', 'ARCHIVED']).default('DREAMING'),
   amountSaved: z.number().min(0).default(0),
   notes: z.string().optional().nullable(),
   specs: z.string().optional().nullable(),
   isCurrentQuest: z.boolean().default(false),
+  
+  // Phase 4 fields
+  priceConfidence: z.enum(['VERIFIED', 'ESTIMATED', 'NEEDS_CONFIRMATION']).default('VERIFIED'),
+  priceBreakdown: z.union([z.string(), z.record(z.unknown())]).optional().nullable(),
+  locationState: z.string().optional().nullable(),
+  locationCity: z.string().optional().nullable(),
+  isManualOverride: z.boolean().default(false),
+  availability: z.string().default('IN_STOCK'),
+  researchMetadata: z.union([z.string(), z.record(z.unknown())]).optional().nullable(),
 });
 
 export async function GET(req: NextRequest) {
@@ -66,6 +77,8 @@ export async function GET(req: NextRequest) {
         { brand: { contains: search } },
         { category: { contains: search } },
         { notes: { contains: search } },
+        { model: { contains: search } },
+        { variant: { contains: search } },
       ];
     }
 
@@ -84,6 +97,12 @@ export async function GET(req: NextRequest) {
     const dreams = await db.dreamPurchase.findMany({
       where,
       orderBy,
+      include: {
+        priceHistory: {
+          orderBy: { recordedAt: 'desc' },
+          take: 10,
+        },
+      },
     });
 
     return NextResponse.json({ dreams });
@@ -111,6 +130,13 @@ export async function POST(req: NextRequest) {
     }
 
     const data = result.data;
+    const breakdownStr = typeof data.priceBreakdown === 'object' && data.priceBreakdown !== null
+      ? JSON.stringify(data.priceBreakdown)
+      : data.priceBreakdown || null;
+      
+    const metadataStr = typeof data.researchMetadata === 'object' && data.researchMetadata !== null
+      ? JSON.stringify(data.researchMetadata)
+      : data.researchMetadata || null;
 
     // If marked as current quest, unset any other current quest
     if (data.isCurrentQuest) {
@@ -124,6 +150,8 @@ export async function POST(req: NextRequest) {
       data: {
         name: data.name,
         brand: data.brand || null,
+        model: data.model || null,
+        variant: data.variant || null,
         category: data.category,
         type: data.type,
         image: data.image || null,
@@ -138,10 +166,44 @@ export async function POST(req: NextRequest) {
         notes: data.notes || null,
         specs: data.specs || null,
         isCurrentQuest: data.isCurrentQuest,
+        
+        priceConfidence: data.priceConfidence,
+        priceBreakdown: breakdownStr,
+        locationState: data.locationState || null,
+        locationCity: data.locationCity || null,
+        isManualOverride: data.isManualOverride,
+        availability: data.availability,
+        researchMetadata: metadataStr,
+        checkedAt: new Date(),
       },
     });
 
-    return NextResponse.json({ dream: newDream }, { status: 201 });
+    // Automatically record initial price history point
+    if (newDream.finalPrice > 0) {
+      await db.priceHistory.create({
+        data: {
+          dreamId: newDream.id,
+          price: newDream.finalPrice,
+          currency: newDream.currency,
+          source: newDream.sourceName || 'Initial Grimoire Inscription',
+          priceType: newDream.priceBreakdown ? 'ON_ROAD' : 'FINAL',
+          confidence: newDream.priceConfidence,
+          breakdown: newDream.priceBreakdown,
+          notes: 'Initial recorded target price',
+        },
+      });
+    }
+
+    const populated = await db.dreamPurchase.findUnique({
+      where: { id: newDream.id },
+      include: {
+        priceHistory: {
+          orderBy: { recordedAt: 'desc' },
+        },
+      },
+    });
+
+    return NextResponse.json({ dream: populated }, { status: 201 });
   } catch (error) {
     console.error('Create dream error:', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

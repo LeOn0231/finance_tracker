@@ -24,6 +24,8 @@ model DreamPurchase {
   id                  String                @id @default(cuid())
   name                String
   brand               String?
+  model               String?
+  variant             String?
   category            String                @default("General") // Vehicles, Electronics, Collectibles, Gaming, Fashion, Books/Manga, Audio, Other
   type                String                @default("BIG_DREAM") // BIG_DREAM, SMALL_DREAM
   image               String?
@@ -40,6 +42,17 @@ model DreamPurchase {
   notes               String?
   specs               String?               // JSON formatted or plain text specifications
   isCurrentQuest      Boolean               @default(false)
+  
+  // Phase 4: Product Research & Price Engine extensions
+  priceConfidence     String                @default("VERIFIED") // VERIFIED, ESTIMATED, NEEDS_CONFIRMATION
+  priceBreakdown      String?               // JSON string of PriceBreakdown
+  locationState       String?               // e.g. "Karnataka", "Maharashtra", "Delhi"
+  locationCity        String?               // e.g. "Bengaluru", "Mumbai"
+  isManualOverride    Boolean               @default(false)
+  checkedAt           DateTime?             @default(now())
+  availability        String?               @default("IN_STOCK") // IN_STOCK, OUT_OF_STOCK, PRE_ORDER, UNKNOWN
+  researchMetadata    String?               // JSON string storing source attribution, raw metadata
+
   dateAdded           DateTime              @default(now())
   datePurchased       DateTime?
   createdAt           DateTime              @default(now())
@@ -52,21 +65,27 @@ model DreamPurchase {
   @@index([type])
   @@index([status])
   @@index([priority])
+  @@index([priceConfidence])
 }
 
 // 3. Price History Tracker
 model PriceHistory {
-  id        String        @id @default(cuid())
-  dreamId   String
-  price     Float
-  currency  String        @default("INR")
-  recordedAt DateTime     @default(now())
-  notes     String?
-  createdAt DateTime      @default(now())
+  id          String        @id @default(cuid())
+  dreamId     String
+  price       Float
+  currency    String        @default("INR")
+  source      String?
+  priceType   String        @default("FINAL") // LISTED, FINAL, ON_ROAD
+  confidence  String        @default("VERIFIED") // VERIFIED, ESTIMATED, NEEDS_CONFIRMATION
+  breakdown   String?       // JSON snapshot of components at recorded time
+  recordedAt  DateTime      @default(now())
+  notes       String?
+  createdAt   DateTime      @default(now())
 
-  dream     DreamPurchase @relation(fields: [dreamId], references: [id], onDelete: Cascade)
+  dream       DreamPurchase @relation(fields: [dreamId], references: [id], onDelete: Cascade)
 
   @@index([dreamId])
+  @@index([recordedAt])
 }
 
 // 4. Financial Month (Income, Fixed Expenses, Savings, Safety Buffer, Dream Budget)

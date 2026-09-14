@@ -1,12 +1,16 @@
 'use client';
 
-import React from 'react';
-import { DreamPurchaseItem } from '@/lib/types';
+import React, { useState } from 'react';
+import { DreamPurchaseItem, CONFIDENCE_CONFIG, PriceConfidence } from '@/lib/types';
+import { formatCurrency } from '@/lib/finance-calculator';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { PriorityBadge } from '@/components/ui/priority-badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { SafeImage } from '@/components/ui/safe-image';
+import { PriceBreakdownCard } from '@/components/research/price-breakdown-card';
+import { PriceHistoryChart } from '@/components/research/price-history-chart';
+import { sounds } from '@/lib/sound';
 import {
   ExternalLink,
   Edit,
@@ -20,6 +24,13 @@ import {
   Layers,
   CheckCircle2,
   Pin,
+  RefreshCw,
+  MapPin,
+  Edit3,
+  TrendingUp,
+  TrendingDown,
+  ShieldCheck,
+  AlertCircle,
 } from 'lucide-react';
 
 interface DreamDetailModalProps {
@@ -30,17 +41,35 @@ interface DreamDetailModalProps {
   onDelete?: (dreamId: string) => void;
   onPurchaseClick?: (dream: DreamPurchaseItem) => void;
   onTogglePin?: (dreamId: string) => void;
+  onDreamUpdated?: (updatedDream: DreamPurchaseItem) => void;
 }
 
 export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
-  dream,
+  dream: initialDream,
   isOpen,
   onClose,
   onEdit,
   onDelete,
   onPurchaseClick,
   onTogglePin,
+  onDreamUpdated,
 }) => {
+  const [dream, setDream] = useState<DreamPurchaseItem | null>(initialDream);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshDelta, setRefreshDelta] = useState<{
+    previousPrice: number;
+    currentPrice: number;
+    diff: number;
+  } | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+
+  // Keep local state in sync with prop changes
+  React.useEffect(() => {
+    setDream(initialDream);
+    setRefreshDelta(null);
+    setRefreshError(null);
+  }, [initialDream, isOpen]);
+
   if (!dream) return null;
 
   const finalPrice = dream.finalPrice || dream.listedPrice || 0;
@@ -48,17 +77,64 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
   const amountSaved = dream.amountSaved || 0;
   const progressPercent = Math.min(100, Math.round((amountSaved / (finalPrice || 1)) * 100));
   const discount = listedPrice > finalPrice ? listedPrice - finalPrice : 0;
+  const currency = dream.currency || 'INR';
+
+  // Price Confidence
+  const confidence: PriceConfidence = (dream.priceConfidence as PriceConfidence) || 'VERIFIED';
+  const confConfig = CONFIDENCE_CONFIG[confidence] || CONFIDENCE_CONFIG.VERIFIED;
 
   // Compute days since dream was added
   const addedDate = new Date(dream.dateAdded);
   const diffTime = Math.abs(Date.now() - addedDate.getTime());
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
+  // Handle Refresh Price action
+  const handleRefreshPrice = async () => {
+    if (!dream) return;
+    setIsRefreshing(true);
+    setRefreshError(null);
+    setRefreshDelta(null);
+    sounds.playClick();
+
+    try {
+      const res = await fetch(`/api/dreams/${dream.id}/refresh-price`, {
+        method: 'POST',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to refresh price');
+      }
+
+      if (data.dream) {
+        setDream(data.dream);
+        if (onDreamUpdated) {
+          onDreamUpdated(data.dream);
+        }
+        setRefreshDelta({
+          previousPrice: data.previousPrice,
+          currentPrice: data.currentPrice,
+          diff: data.diff,
+        });
+        sounds.playTierUp();
+      }
+    } catch (err: unknown) {
+      setRefreshError(err instanceof Error ? err.message : 'Market price check failed');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const locationText = dream.locationState
+    ? `${dream.locationCity ? `${dream.locationCity}, ` : ''}${dream.locationState}`
+    : undefined;
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      maxWidth="2xl"
+      maxWidth="3xl"
       title={
         <div className="flex items-center gap-3">
           <PriorityBadge priority={dream.priority} size="md" />
@@ -67,9 +143,55 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
       }
     >
       <div className="space-y-6">
+        {/* Price Refresh Delta Notice */}
+        {refreshDelta && (
+          <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-between flex-wrap gap-2 text-xs animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <div>
+                <span className="font-bold text-white">Market Price Verified: </span>
+                <span className="text-slate-300">
+                  Previous {formatCurrency(refreshDelta.previousPrice, currency)} &rarr; Current{' '}
+                  <strong className="text-amber-300 font-mono">
+                    {formatCurrency(refreshDelta.currentPrice, currency)}
+                  </strong>
+                </span>
+              </div>
+            </div>
+
+            <div
+              className={`font-mono font-bold px-2.5 py-0.5 rounded-lg border ${
+                refreshDelta.diff > 0
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                  : refreshDelta.diff < 0
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  : 'bg-slate-500/20 text-slate-300 border-slate-500/40'
+              }`}
+            >
+              {refreshDelta.diff > 0
+                ? `+${formatCurrency(refreshDelta.diff, currency)}`
+                : refreshDelta.diff < 0
+                ? `-${formatCurrency(Math.abs(refreshDelta.diff), currency)}`
+                : 'No change'}
+            </div>
+          </div>
+        )}
+
+        {refreshError && (
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between">
+            <span>{refreshError}</span>
+            <button
+              onClick={() => setRefreshError(null)}
+              className="text-slate-400 hover:text-white text-xs"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {/* Hero Image & Headline */}
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-5 items-start">
-          <div className="sm:col-span-5 relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl aspect-[4/3] sm:aspect-square">
+          <div className="sm:col-span-5 relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl aspect-[4/3] sm:aspect-square bg-[#090c14]">
             <SafeImage
               src={dream.image}
               alt={dream.name}
@@ -93,30 +215,56 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-400">
                 {dream.category}
               </span>
+              {/* Confidence Badge */}
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border flex items-center gap-1 ${confConfig.badgeClass}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${confConfig.dotClass}`} />
+                {confConfig.label}
+              </span>
+              {dream.isManualOverride && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 flex items-center gap-1 font-semibold">
+                  <Edit3 className="w-2.5 h-2.5" />
+                  MANUAL
+                </span>
+              )}
             </div>
 
             <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight leading-snug">
               {dream.name}
             </h2>
 
-            {dream.brand && (
-              <p className="text-xs font-bold text-amber-400/90 uppercase tracking-wider">
-                Brand: <span className="text-slate-200">{dream.brand}</span>
-              </p>
-            )}
+            <div className="flex items-center gap-3 text-xs flex-wrap">
+              {dream.brand && (
+                <p className="font-bold text-amber-400/90 uppercase tracking-wider">
+                  Brand: <span className="text-slate-200">{dream.brand}</span>
+                </p>
+              )}
+              {dream.variant && (
+                <p className="text-slate-400">
+                  Trim: <span className="text-purple-300 font-semibold">{dream.variant}</span>
+                </p>
+              )}
+              {locationText && (
+                <div className="inline-flex items-center gap-1 text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20">
+                  <MapPin className="w-3 h-3 text-purple-400" />
+                  <span>{locationText}</span>
+                </div>
+              )}
+            </div>
 
             {/* Price Box */}
             <div className="p-3.5 rounded-xl bg-[#0b0e18] border border-white/10 space-y-2">
               <div className="flex items-baseline justify-between">
-                <span className="text-xs text-slate-400">Target Value:</span>
+                <span className="text-xs text-slate-400">
+                  {dream.priceBreakdown ? 'Final On-Road Value:' : 'Target Value:'}
+                </span>
                 <div className="flex items-baseline gap-2">
                   {discount > 0 && (
                     <span className="text-xs text-slate-500 line-through">
-                      ${listedPrice.toLocaleString()}
+                      {formatCurrency(listedPrice, currency)}
                     </span>
                   )}
                   <span className="text-xl font-extrabold text-amber-300 font-mono">
-                    ${finalPrice.toLocaleString()}
+                    {formatCurrency(finalPrice, currency)}
                   </span>
                 </div>
               </div>
@@ -124,7 +272,7 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
               {discount > 0 && (
                 <div className="flex items-center justify-between text-xs text-emerald-400 font-medium pt-1 border-t border-white/5">
                   <span>Price Advantage:</span>
-                  <span>-${discount.toLocaleString()} savings</span>
+                  <span>-{formatCurrency(discount, currency)} savings</span>
                 </div>
               )}
 
@@ -132,7 +280,7 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
               {dream.status !== 'PURCHASED' && (
                 <div className="space-y-1.5 pt-1">
                   <div className="flex justify-between text-[11px] text-slate-400 font-mono">
-                    <span>Saved: ${amountSaved.toLocaleString()}</span>
+                    <span>Saved: {formatCurrency(amountSaved, currency)}</span>
                     <span>{progressPercent}% Funded</span>
                   </div>
                   <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
@@ -147,6 +295,18 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
           </div>
         </div>
 
+        {/* Price Breakdown Section (if vehicle or structured components exist) */}
+        {dream.priceBreakdown && (
+          <PriceBreakdownCard breakdown={dream.priceBreakdown} currency={currency} />
+        )}
+
+        {/* Price History Trajectory Chart */}
+        <PriceHistoryChart
+          history={dream.priceHistory}
+          currentPrice={finalPrice}
+          currency={currency}
+        />
+
         {/* Specifications Section */}
         {dream.specs && (
           <div className="p-4 rounded-xl bg-[#0e121f] border border-white/10">
@@ -154,7 +314,7 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
               <Layers className="w-3.5 h-3.5" />
               Grimoire Specifications & Attributes
             </h4>
-            <p className="text-xs sm:text-sm text-slate-300 whitespace-pre-line leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-300 whitespace-pre-line leading-relaxed font-mono">
               {dream.specs}
             </p>
           </div>
@@ -183,6 +343,12 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
             <Clock className="w-3.5 h-3.5 text-slate-500" />
             <span>Age: {diffDays} {diffDays === 1 ? 'day' : 'days'}</span>
           </div>
+          <div className="flex items-center gap-1.5 col-span-2">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>
+              Checked: {dream.checkedAt ? new Date(dream.checkedAt).toLocaleDateString() : 'Initial'}
+            </span>
+          </div>
           {dream.datePurchased && (
             <div className="flex items-center gap-1.5 text-teal-400 col-span-2">
               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -193,18 +359,31 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/10">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {dream.sourceUrl && (
               <a
                 href={dream.sourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition-colors"
               >
                 <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
                 {dream.sourceName ? `View on ${dream.sourceName}` : 'View Source'}
               </a>
             )}
+
+            {/* Refresh Price Button */}
+            <button
+              type="button"
+              onClick={handleRefreshPrice}
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-all"
+              title="Researches current rates and updates price history"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Checking...' : 'Refresh Price'}
+            </button>
+
             {onTogglePin && (
               <button
                 onClick={() => onTogglePin(dream.id)}
