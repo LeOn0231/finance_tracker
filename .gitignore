@@ -11,12 +11,12 @@
 # Production build artifacts
 /build
 /dist
+tsconfig.tsbuildinfo
 *.tsbuildinfo
 
 # Environment variables
 .env
 .env*.local
-!.env.example
 
 # Local SQLite databases
 *.db

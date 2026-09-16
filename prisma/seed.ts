@@ -102,7 +102,7 @@ async function main() {
           savingsTarget,
           safetyBuffer,
           dreamBudget,
-          currency: 'USD',
+          currency: 'INR',
           notes,
         },
       });
@@ -177,29 +177,29 @@ async function main() {
     }
   }
 
-  // Seed current month
+  // Seed current month (INR Ledgers)
   await seedMonth(
     currentMonth,
     currentYear,
     [
-      { source: 'Salary', desc: 'Primary Tech Engineering Salary', amount: 4800 },
-      { source: 'Freelance', desc: 'Anime UI Client Project', amount: 1200 },
+      { source: 'Salary', desc: 'Primary Tech Engineering Salary', amount: 120000 },
+      { source: 'Freelance', desc: 'Anime UI Client Project', amount: 35000 },
     ],
     [
-      { desc: 'Apartment Rent / Mortgage', category: 'Rent/EMI', amount: 1600 },
-      { desc: 'Food & Groceries', category: 'Food', amount: 600 },
-      { desc: 'High-speed Fiber Internet & 5G', category: 'Internet', amount: 120 },
-      { desc: 'Electric & Utilities', category: 'Electricity', amount: 150 },
-      { desc: 'Health & Term Insurance', category: 'Insurance', amount: 200 },
-      { desc: 'Streaming & Software Subscriptions', category: 'Subscriptions', amount: 80 },
+      { desc: 'Apartment Rent / EMI', category: 'Rent/EMI', amount: 35000 },
+      { desc: 'Food & Groceries', category: 'Food', amount: 15000 },
+      { desc: 'High-speed Fiber Internet & 5G', category: 'Internet', amount: 1500 },
+      { desc: 'Electricity & Utilities', category: 'Electricity', amount: 3500 },
+      { desc: 'Health & Term Insurance', category: 'Insurance', amount: 5000 },
+      { desc: 'Streaming & Software Subscriptions', category: 'Subscriptions', amount: 2000 },
     ],
-    1500, // Savings target
-    800,  // Safety buffer
-    500,  // Monthly Dream purchase budget
+    45000, // Savings target (₹45,000)
+    15000, // Safety buffer (₹15,000)
+    12000, // Monthly Dream purchase budget (₹12,000)
     [
-      { desc: 'Weekend Izakaya Dining', category: 'Dining', amount: 85, date: new Date(currentYear, currentMonth - 1, 4) },
-      { desc: 'Mechanical Keyboard Switches & Lube', category: 'Tech & Hobbies', amount: 65, date: new Date(currentYear, currentMonth - 1, 8) },
-      { desc: 'Artbook Import from Tokyo', category: 'Manga & Books', amount: 45, date: new Date(currentYear, currentMonth - 1, 12) },
+      { desc: 'Weekend Izakaya Dining', category: 'Dining', amount: 3200, date: new Date(currentYear, currentMonth - 1, 4) },
+      { desc: 'Mechanical Keyboard Switches & Lube', category: 'Tech & Hobbies', amount: 2400, date: new Date(currentYear, currentMonth - 1, 8) },
+      { desc: 'Artbook Import from Tokyo', category: 'Manga & Books', amount: 3500, date: new Date(currentYear, currentMonth - 1, 12) },
     ],
     'September Quest: Maintain high savings rate for Super Meteor 650 while allowing small dream rewards.'
   );
@@ -211,23 +211,23 @@ async function main() {
     prevMonth,
     prevYear,
     [
-      { source: 'Salary', desc: 'Primary Tech Engineering Salary', amount: 4800 },
-      { source: 'Freelance', desc: 'Design Consulting', amount: 800 },
+      { source: 'Salary', desc: 'Primary Tech Engineering Salary', amount: 120000 },
+      { source: 'Freelance', desc: 'Design Consulting', amount: 25000 },
     ],
     [
-      { desc: 'Apartment Rent / Mortgage', category: 'Rent/EMI', amount: 1600 },
-      { desc: 'Food & Groceries', category: 'Food', amount: 580 },
-      { desc: 'High-speed Fiber Internet & 5G', category: 'Internet', amount: 120 },
-      { desc: 'Electric & Utilities', category: 'Electricity', amount: 140 },
-      { desc: 'Health & Term Insurance', category: 'Insurance', amount: 200 },
-      { desc: 'Streaming & Software Subscriptions', category: 'Subscriptions', amount: 80 },
+      { desc: 'Apartment Rent / EMI', category: 'Rent/EMI', amount: 35000 },
+      { desc: 'Food & Groceries', category: 'Food', amount: 14500 },
+      { desc: 'High-speed Fiber Internet & 5G', category: 'Internet', amount: 1500 },
+      { desc: 'Electricity & Utilities', category: 'Electricity', amount: 3200 },
+      { desc: 'Health & Term Insurance', category: 'Insurance', amount: 5000 },
+      { desc: 'Streaming & Software Subscriptions', category: 'Subscriptions', amount: 2000 },
     ],
-    1400,
-    800,
-    400,
+    40000,
+    15000,
+    10000,
     [
-      { desc: 'Anime Expo Tickets & Merch', category: 'Events', amount: 180, date: new Date(prevYear, prevMonth - 1, 14) },
-      { desc: 'Specialty Coffee Beans', category: 'Food', amount: 40, date: new Date(prevYear, prevMonth - 1, 20) },
+      { desc: 'Anime Expo Tickets & Merch', category: 'Events', amount: 5500, date: new Date(prevYear, prevMonth - 1, 14) },
+      { desc: 'Specialty Coffee Beans', category: 'Food', amount: 1200, date: new Date(prevYear, prevMonth - 1, 20) },
     ],
     'August Quest: Solid discipline and achieved savings goals.'
   );

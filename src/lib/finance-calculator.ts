@@ -14,9 +14,10 @@ export function roundMoney(amount: number): number {
 export function formatCurrency(amount: number, currency: string = 'INR'): string {
   const rounded = roundMoney(amount);
   const symbol = currency === 'INR' ? '₹' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : currency === 'JPY' ? '¥' : '$';
+  const locale = currency === 'INR' ? 'en-IN' : 'en-US';
   
-  // Format with commas
-  const parts = Math.abs(rounded).toLocaleString('en-US', {
+  // Format with commas (Indian numbering for INR, standard for others)
+  const parts = Math.abs(rounded).toLocaleString(locale, {
     minimumFractionDigits: rounded % 1 !== 0 ? 2 : 0,
     maximumFractionDigits: 2,
   });
