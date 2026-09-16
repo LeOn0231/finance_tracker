@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { AppShell } from '@/components/layout/app-shell';
 import { DreamPurchaseItem, DashboardStats } from '@/lib/types';
 import { PriorityBadge } from '@/components/ui/priority-badge';
@@ -13,8 +14,13 @@ import { DreamDetailModal } from '@/components/dreams/dream-detail-modal';
 import { PurchaseModal } from '@/components/dreams/purchase-modal';
 import { CelebrationOverlay } from '@/components/celebration/celebration-overlay';
 import { EmptyState } from '@/components/ui/empty-state';
+import { MotivationalBanner } from '@/components/ui/motivational-banner';
+import { CurrentQuestHero } from '@/components/dreams/current-quest-hero';
+import { DreamCardSkeleton } from '@/components/ui/skeleton';
 import { formatCurrency, MONTH_NAMES } from '@/lib/finance-calculator';
-import Link from 'next/link';
+import { EvaluatedAchievement } from '@/lib/achievements';
+import { useTheme } from '@/lib/theme-context';
+import { sounds } from '@/lib/sound';
 import {
   Sparkles,
   Crown,
@@ -37,6 +43,8 @@ import {
 } from 'lucide-react';
 
 export default function DashboardPage() {
+  const { currency, themeConfig } = useTheme();
+
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [dreams, setDreams] = useState<DreamPurchaseItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,6 +55,7 @@ export default function DashboardPage() {
   const [selectedDream, setSelectedDream] = useState<DreamPurchaseItem | null>(null);
   const [purchasingDream, setPurchasingDream] = useState<DreamPurchaseItem | null>(null);
   const [celebratingDream, setCelebratingDream] = useState<DreamPurchaseItem | null>(null);
+  const [unlockedAchievement, setUnlockedAchievement] = useState<EvaluatedAchievement | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -151,22 +160,12 @@ export default function DashboardPage() {
     if (res.ok) {
       const data = await res.json();
       setCelebratingDream(data.dream);
+      setUnlockedAchievement(data.unlockedAchievement || null);
       await fetchData();
     }
   };
 
   const currentQuest = stats?.currentQuest;
-  const currentQuestProgress = currentQuest
-    ? Math.min(
-        100,
-        Math.round(
-          ((currentQuest.amountSaved || 0) /
-            (currentQuest.finalPrice || currentQuest.listedPrice || 1)) *
-            100
-        )
-      )
-    : 0;
-
   const finance = stats?.currentMonthFinance;
 
   const activeDreams = dreams.filter((d) => d.status !== 'PURCHASED');
@@ -183,10 +182,10 @@ export default function DashboardPage() {
             <div className="space-y-2 max-w-xl">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-semibold">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Grimoire Active • Wizard King Path</span>
+                <span>Theme: {themeConfig.name}</span>
               </div>
               <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-                Life Quest Dashboard
+                Life Quest Sanctuary
               </h1>
               <p className="text-sm text-slate-400 leading-relaxed">
                 Track your dream acquisitions, allocate savings, and conquer every tier of your ambition.
@@ -196,6 +195,7 @@ export default function DashboardPage() {
             <div className="flex flex-wrap items-center gap-3">
               <Button
                 onClick={() => {
+                  sounds.playClick();
                   setEditingDream(null);
                   setIsAddModalOpen(true);
                 }}
@@ -209,7 +209,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* COMPACT "THIS MONTH" FINANCE CARD (Requirement #15) */}
+        {/* Motivational Banner */}
+        <MotivationalBanner />
+
+        {/* COMPACT "THIS MONTH" FINANCE CARD */}
         {finance && (
           <div className="rounded-3xl bg-gradient-to-br from-[#121929] via-[#0f1422] to-[#0a0d16] border border-emerald-500/30 p-5 sm:p-6 shadow-2xl relative overflow-hidden">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
@@ -229,6 +232,7 @@ export default function DashboardPage() {
 
               <Link
                 href="/money"
+                onClick={() => sounds.playClick()}
                 className="inline-flex items-center gap-1 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
               >
                 <span>Open Money Sanctuary</span>
@@ -241,42 +245,42 @@ export default function DashboardPage() {
               <div className="p-3 rounded-xl bg-[#090c14] border border-white/5">
                 <span className="text-[10px] text-emerald-400 uppercase block font-sans font-bold">Income</span>
                 <span className="font-bold text-slate-200 text-sm">
-                  ${finance.totalIncome.toLocaleString()}
+                  {formatCurrency(finance.totalIncome, currency)}
                 </span>
               </div>
 
               <div className="p-3 rounded-xl bg-[#090c14] border border-white/5">
                 <span className="text-[10px] text-rose-400 uppercase block font-sans font-bold">Fixed</span>
                 <span className="font-bold text-slate-200 text-sm">
-                  ${finance.fixedExpenses.toLocaleString()}
+                  {formatCurrency(finance.fixedExpenses, currency)}
                 </span>
               </div>
 
               <div className="p-3 rounded-xl bg-[#090c14] border border-white/5">
                 <span className="text-[10px] text-purple-400 uppercase block font-sans font-bold">Savings</span>
                 <span className="font-bold text-purple-300 text-sm">
-                  ${finance.savingsTarget.toLocaleString()}
+                  {formatCurrency(finance.savingsTarget, currency)}
                 </span>
               </div>
 
               <div className="p-3 rounded-xl bg-[#090c14] border border-white/5">
                 <span className="text-[10px] text-amber-400 uppercase block font-sans font-bold">Spent</span>
                 <span className="font-bold text-amber-300 text-sm">
-                  ${finance.actualSpending.toLocaleString()}
+                  {formatCurrency(finance.actualSpending, currency)}
                 </span>
               </div>
 
               <div className="p-3 rounded-xl bg-[#090c14] border border-white/5">
                 <span className="text-[10px] text-slate-400 uppercase block font-sans font-bold">Available</span>
                 <span className="font-bold text-slate-200 text-sm">
-                  ${finance.availableMoney.toLocaleString()}
+                  {formatCurrency(finance.availableMoney, currency)}
                 </span>
               </div>
 
               <div className="p-3 rounded-xl bg-[#090c14] border border-white/5">
                 <span className="text-[10px] text-sky-400 uppercase block font-sans font-bold">Buffer</span>
                 <span className="font-bold text-sky-300 text-sm">
-                  ${finance.safetyBuffer.toLocaleString()}
+                  {formatCurrency(finance.safetyBuffer, currency)}
                 </span>
               </div>
 
@@ -287,7 +291,7 @@ export default function DashboardPage() {
               }`}>
                 <span className="text-[10px] uppercase block font-sans font-bold">Safe To Spend</span>
                 <span className="font-black text-sm">
-                  ${finance.safeToSpend.toLocaleString()}
+                  {formatCurrency(finance.safeToSpend, currency)}
                 </span>
               </div>
             </div>
@@ -311,7 +315,8 @@ export default function DashboardPage() {
 
           <Link
             href="/big-dreams"
-            className="p-4 sm:p-5 rounded-2xl bg-[#121624]/90 border border-white/[0.08] hover:border-amber-500/40 transition-all hover:bg-surface-elevated shadow-lg flex flex-col justify-between group"
+            onClick={() => sounds.playClick()}
+            className="p-4 sm:p-5 rounded-2xl bg-[#121624]/90 border border-white/[0.08] hover:border-amber-500/40 transition-all shadow-lg flex flex-col justify-between group"
           >
             <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
               <span className="font-semibold uppercase tracking-wider text-amber-400/90">Big Dreams</span>
@@ -327,7 +332,8 @@ export default function DashboardPage() {
 
           <Link
             href="/small-dreams"
-            className="p-4 sm:p-5 rounded-2xl bg-[#121624]/90 border border-white/[0.08] hover:border-purple-500/40 transition-all hover:bg-surface-elevated shadow-lg flex flex-col justify-between group"
+            onClick={() => sounds.playClick()}
+            className="p-4 sm:p-5 rounded-2xl bg-[#121624]/90 border border-white/[0.08] hover:border-purple-500/40 transition-all shadow-lg flex flex-col justify-between group"
           >
             <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
               <span className="font-semibold uppercase tracking-wider text-purple-400/90">Small Dreams</span>
@@ -343,7 +349,8 @@ export default function DashboardPage() {
 
           <Link
             href="/purchased"
-            className="p-4 sm:p-5 rounded-2xl bg-[#121624]/90 border border-white/[0.08] hover:border-teal-500/40 transition-all hover:bg-surface-elevated shadow-lg flex flex-col justify-between group"
+            onClick={() => sounds.playClick()}
+            className="p-4 sm:p-5 rounded-2xl bg-[#121624]/90 border border-white/[0.08] hover:border-teal-500/40 transition-all shadow-lg flex flex-col justify-between group"
           >
             <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
               <span className="font-semibold uppercase tracking-wider text-teal-400/90">Purchased</span>
@@ -363,7 +370,7 @@ export default function DashboardPage() {
               <DollarSign className="w-4 h-4 text-slate-400" />
             </div>
             <div className="text-xl sm:text-2xl font-black text-slate-200 font-mono">
-              ${(stats?.totalDreamValue ?? 0).toLocaleString()}
+              {formatCurrency(stats?.totalDreamValue ?? 0, currency)}
             </div>
           </div>
 
@@ -373,7 +380,7 @@ export default function DashboardPage() {
               <CheckCircle2 className="w-4 h-4 text-teal-400" />
             </div>
             <div className="text-xl sm:text-2xl font-black text-teal-300 font-mono">
-              ${(stats?.purchasedValue ?? 0).toLocaleString()}
+              {formatCurrency(stats?.purchasedValue ?? 0, currency)}
             </div>
           </div>
 
@@ -384,7 +391,7 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-baseline justify-between">
               <div className="text-2xl sm:text-3xl font-black text-amber-300 font-mono">
-                ${(stats?.remainingValue ?? 0).toLocaleString()}
+                {formatCurrency(stats?.remainingValue ?? 0, currency)}
               </div>
               <span className="text-xs font-semibold text-amber-400/80 uppercase tracking-wider">
                 Goal to Fund
@@ -393,111 +400,21 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* FEATURED: CURRENT QUEST HERO CARD */}
-        {currentQuest && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-                <Flame className="w-5 h-5 text-amber-400 fill-amber-400 animate-pulse" />
-                <span>Current Main Quest</span>
-              </h2>
-              <span className="text-xs font-mono text-amber-400 tracking-wider">ACTIVE FOCUS</span>
-            </div>
-
-            <div className="relative rounded-3xl bg-gradient-to-br from-[#161c30] via-[#101424] to-[#0c0f1a] border-2 border-amber-500/50 quest-aura-active p-6 sm:p-8 shadow-2xl overflow-hidden">
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-                <div className="md:col-span-4 relative aspect-[16/10] md:aspect-square rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-                  <SafeImage
-                    src={currentQuest.image}
-                    alt={currentQuest.name}
-                    category={currentQuest.category}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute top-2.5 left-2.5">
-                    <PriorityBadge priority={currentQuest.priority} size="md" showSublabel />
-                  </div>
-                </div>
-
-                <div className="md:col-span-8 space-y-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                      <StatusBadge status={currentQuest.status} size="sm" />
-                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-300">
-                        {currentQuest.category}
-                      </span>
-                      {currentQuest.brand && (
-                        <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
-                          {currentQuest.brand}
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                      {currentQuest.name}
-                    </h3>
-                    {currentQuest.notes && (
-                      <p className="text-xs sm:text-sm text-slate-300 mt-2 line-clamp-2">
-                        {currentQuest.notes}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-[#090b12]/90 border border-white/10 space-y-2">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-xs text-slate-400">Target Acquisition Value:</span>
-                      <span className="text-2xl font-black text-amber-300 font-mono">
-                        ${(currentQuest.finalPrice || currentQuest.listedPrice || 0).toLocaleString()}
-                      </span>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs font-mono text-slate-400">
-                        <span>Funded: ${(currentQuest.amountSaved || 0).toLocaleString()}</span>
-                        <span>{currentQuestProgress}% Complete</span>
-                      </div>
-                      <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-amber-500 via-yellow-400 to-emerald-400 rounded-full transition-all duration-500"
-                          style={{ width: `${currentQuestProgress}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        onClick={() => setSelectedDream(currentQuest)}
-                        variant="secondary"
-                        size="md"
-                      >
-                        Inspect Dossier
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setEditingDream(currentQuest);
-                          setIsAddModalOpen(true);
-                        }}
-                        variant="ghost"
-                        size="md"
-                      >
-                        Update Progress
-                      </Button>
-                    </div>
-
-                    <Button
-                      onClick={() => setPurchasingDream(currentQuest)}
-                      variant="gold"
-                      size="md"
-                    >
-                      <Trophy className="w-4 h-4 mr-1.5" />
-                      I Bought This!
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* FEATURED: CURRENT MAIN QUEST HERO */}
+        <div className="space-y-3">
+          <CurrentQuestHero
+            currentQuest={currentQuest || null}
+            allDreams={dreams}
+            currency={currency}
+            onSelectQuest={setSelectedDream}
+            onSwitchPin={handleTogglePin}
+            onPurchaseClick={setPurchasingDream}
+            onOpenAddDream={() => {
+              setEditingDream(null);
+              setIsAddModalOpen(true);
+            }}
+          />
+        </div>
 
         {/* BIG DREAMS PREVIEW SECTION */}
         <div className="space-y-4">
@@ -511,6 +428,7 @@ export default function DashboardPage() {
             </div>
             <Link
               href="/big-dreams"
+              onClick={() => sounds.playClick()}
               className="inline-flex items-center gap-1 text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors"
             >
               <span>View All ({bigDreams.length})</span>
@@ -518,7 +436,13 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          {bigDreams.length === 0 ? (
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <DreamCardSkeleton variant="big" />
+              <DreamCardSkeleton variant="big" />
+              <DreamCardSkeleton variant="big" />
+            </div>
+          ) : bigDreams.length === 0 ? (
             <EmptyState
               type="BIG_DREAM"
               onAction={() => {
@@ -533,6 +457,7 @@ export default function DashboardPage() {
                   key={dream.id}
                   dream={dream}
                   variant="big"
+                  currency={currency}
                   onSelect={setSelectedDream}
                   onEdit={(d) => {
                     setEditingDream(d);
@@ -559,6 +484,7 @@ export default function DashboardPage() {
             </div>
             <Link
               href="/small-dreams"
+              onClick={() => sounds.playClick()}
               className="inline-flex items-center gap-1 text-xs font-bold text-purple-400 hover:text-purple-300 transition-colors"
             >
               <span>View All ({smallDreams.length})</span>
@@ -566,7 +492,14 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          {smallDreams.length === 0 ? (
+          {isLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              <DreamCardSkeleton variant="small" />
+              <DreamCardSkeleton variant="small" />
+              <DreamCardSkeleton variant="small" />
+              <DreamCardSkeleton variant="small" />
+            </div>
+          ) : smallDreams.length === 0 ? (
             <EmptyState
               type="SMALL_DREAM"
               onAction={() => {
@@ -581,6 +514,8 @@ export default function DashboardPage() {
                   key={dream.id}
                   dream={dream}
                   variant="small"
+                  currency={currency}
+                  safeToSpend={stats?.currentMonthFinance?.safeToSpend}
                   onSelect={setSelectedDream}
                   onEdit={(d) => {
                     setEditingDream(d);
@@ -634,13 +569,17 @@ export default function DashboardPage() {
         isOpen={Boolean(purchasingDream)}
         onClose={() => setPurchasingDream(null)}
         safeToSpend={stats?.currentMonthFinance?.safeToSpend || 0}
-        currency="USD"
+        currency={currency}
         onConfirmPurchase={handleConfirmPurchase}
       />
 
       <CelebrationOverlay
         dream={celebratingDream}
-        onClose={() => setCelebratingDream(null)}
+        unlockedAchievement={unlockedAchievement}
+        onClose={() => {
+          setCelebratingDream(null);
+          setUnlockedAchievement(null);
+        }}
       />
     </AppShell>
   );

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { evaluateAchievements } from '@/lib/achievements';
 
 const purchaseActionSchema = z.object({
   action: z.enum(['PURCHASE', 'CANCEL_PURCHASE']).default('PURCHASE'),
@@ -42,96 +43,125 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const { action, finalPrice, purchaseDate, notes, recordInSpending } = result.data;
 
     if (action === 'PURCHASE') {
+      // Idempotency check: if already purchased, return existing state safely
+      if (dream.status === 'PURCHASED') {
+        const existingTx = await db.purchaseTransaction.findFirst({
+          where: { linkedDreamId: id },
+          orderBy: { date: 'desc' },
+        });
+
+        return NextResponse.json({
+          success: true,
+          dream,
+          transaction: existingTx || null,
+          unlockedAchievement: null,
+          message: 'Dream was already marked as purchased.',
+        });
+      }
+
       const actualPaid = finalPrice !== undefined ? finalPrice : dream.finalPrice;
       const boughtDate = purchaseDate ? new Date(purchaseDate) : new Date();
 
       const month = boughtDate.getMonth() + 1;
       const year = boughtDate.getFullYear();
 
-      // Find or create current financial month
-      let financialMonth = await db.financialMonth.findUnique({
-        where: { month_year: { month, year } },
-      });
+      // Execute purchase atomically
+      const { updatedDream, transaction } = await db.$transaction(async (tx) => {
+        // Find or create current financial month
+        let financialMonth = await tx.financialMonth.findUnique({
+          where: { month_year: { month, year } },
+        });
 
-      if (!financialMonth) {
-        financialMonth = await db.financialMonth.create({
+        if (!financialMonth) {
+          financialMonth = await tx.financialMonth.create({
+            data: {
+              month,
+              year,
+              savingsTarget: 1500,
+              safetyBuffer: 800,
+              dreamBudget: 500,
+              currency: 'INR',
+            },
+          });
+        }
+
+        const dreamRecord = await tx.dreamPurchase.update({
+          where: { id },
           data: {
-            month,
-            year,
-            savingsTarget: 1500,
-            safetyBuffer: 800,
-            dreamBudget: 500,
-            currency: 'INR',
+            status: 'PURCHASED',
+            finalPrice: actualPaid,
+            amountSaved: actualPaid,
+            datePurchased: boughtDate,
+            isCurrentQuest: false,
+            notes: notes ? `${dream.notes ? `${dream.notes}\n` : ''}[Purchased]: ${notes}` : dream.notes,
           },
         });
-      }
 
-      const updatedDream = await db.dreamPurchase.update({
-        where: { id },
-        data: {
-          status: 'PURCHASED',
-          finalPrice: actualPaid,
-          amountSaved: actualPaid,
-          datePurchased: boughtDate,
-          isCurrentQuest: false,
-          notes: notes ? `${dream.notes ? `${dream.notes}\n` : ''}[Purchased]: ${notes}` : dream.notes,
-        },
-      });
-
-      // Record in purchase transaction log
-      const transaction = await db.purchaseTransaction.create({
-        data: {
-          date: boughtDate,
-          description: `Acquired: ${dream.name}`,
-          category: dream.category,
-          amount: actualPaid,
-          linkedDreamId: id,
-          financialMonthId: financialMonth.id,
-          notes: notes || 'Quest completed and verified.',
-        },
-      });
-
-      // If requested, record in monthly spending ledger
-      if (recordInSpending) {
-        await db.expense.create({
+        // Record single purchase transaction log
+        const txRecord = await tx.purchaseTransaction.create({
           data: {
-            financialMonthId: financialMonth.id,
-            description: `[Dream Acquisition] ${dream.name}`,
+            date: boughtDate,
+            description: `Acquired: ${dream.name}`,
             category: dream.category,
             amount: actualPaid,
-            type: 'ADDITIONAL_SPENDING',
-            isRecurring: false,
-            isPaid: true,
             linkedDreamId: id,
-            notes: notes || 'Dream purchase deducted from safe-to-spend.',
-            date: boughtDate,
+            financialMonthId: financialMonth.id,
+            notes: notes || 'Quest completed and verified.',
           },
         });
-      }
+
+        // If requested, record in monthly spending ledger
+        if (recordInSpending) {
+          await tx.expense.create({
+            data: {
+              financialMonthId: financialMonth.id,
+              description: `[Dream Acquisition] ${dream.name}`,
+              category: dream.category,
+              amount: actualPaid,
+              type: 'ADDITIONAL_SPENDING',
+              isRecurring: false,
+              isPaid: true,
+              linkedDreamId: id,
+              notes: notes || 'Dream purchase deducted from safe-to-spend.',
+              date: boughtDate,
+            },
+          });
+        }
+
+        return { updatedDream: dreamRecord, transaction: txRecord };
+      });
+
+      // Evaluate achievements upon purchase
+      const { newlyUnlocked } = await evaluateAchievements();
 
       return NextResponse.json({
         success: true,
         dream: updatedDream,
         transaction,
+        unlockedAchievement: newlyUnlocked[0] || null,
         message: 'Quest Completed! Dream Acquired!',
       });
     } else {
-      // Revert purchase
-      const updatedDream = await db.dreamPurchase.update({
-        where: { id },
-        data: {
-          status: 'SAVING',
-          datePurchased: null,
-        },
-      });
+      // Revert purchase atomically
+      const updatedDream = await db.$transaction(async (tx) => {
+        const dreamRecord = await tx.dreamPurchase.update({
+          where: { id },
+          data: {
+            status: 'SAVING',
+            datePurchased: null,
+          },
+        });
 
-      // Remove linked transactions and spending records
-      await db.purchaseTransaction.deleteMany({
-        where: { linkedDreamId: id },
-      });
+        // Remove linked transactions and spending records
+        await tx.purchaseTransaction.deleteMany({
+          where: { linkedDreamId: id },
+        });
 
-      await db.expense.deleteMany({
-        where: { linkedDreamId: id, type: 'ADDITIONAL_SPENDING' },
+        await tx.expense.deleteMany({
+          where: { linkedDreamId: id, type: 'ADDITIONAL_SPENDING' },
+        });
+
+        return dreamRecord;
       });
 
       return NextResponse.json({

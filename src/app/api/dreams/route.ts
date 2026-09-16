@@ -24,7 +24,19 @@ const createDreamSchema = z.object({
   specs: z.string().optional().nullable(),
   isCurrentQuest: z.boolean().default(false),
   
-  // Phase 4 fields
+  // Universal Final Price Engine additions
+  verifiedSource: z.string().optional().nullable(),
+  sourceType: z.string().optional().nullable(),
+  lastChecked: z.string().datetime().optional().nullable(),
+  shippingCost: z.number().min(0).default(0),
+  mandatoryFees: z.number().min(0).default(0),
+  finalCheckoutPrice: z.number().min(0).default(0),
+  manualOverride: z.boolean().default(false),
+  previousPrice: z.number().optional().nullable(),
+  officialUrl: z.string().optional().nullable(),
+  marketplaceUrl: z.string().optional().nullable(),
+
+  // Price Engine fields
   priceConfidence: z.enum(['VERIFIED', 'ESTIMATED', 'NEEDS_CONFIRMATION']).default('VERIFIED'),
   priceBreakdown: z.union([z.string(), z.record(z.unknown())]).optional().nullable(),
   locationState: z.string().optional().nullable(),
@@ -146,6 +158,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const finalPriceVal = data.finalPrice || data.listedPrice || 0;
+    const finalCheckoutVal = data.finalCheckoutPrice || finalPriceVal;
+
     const newDream = await db.dreamPurchase.create({
       data: {
         name: data.name,
@@ -157,8 +172,17 @@ export async function POST(req: NextRequest) {
         image: data.image || null,
         sourceUrl: data.sourceUrl || null,
         sourceName: data.sourceName || null,
-        listedPrice: data.listedPrice || data.finalPrice,
-        finalPrice: data.finalPrice,
+        listedPrice: data.listedPrice || finalPriceVal,
+        finalPrice: finalPriceVal,
+        finalCheckoutPrice: finalCheckoutVal,
+        shippingCost: data.shippingCost || 0,
+        mandatoryFees: data.mandatoryFees || 0,
+        verifiedSource: data.verifiedSource || data.sourceName || null,
+        sourceType: data.sourceType || 'OFFICIAL',
+        manualOverride: Boolean(data.manualOverride || data.isManualOverride),
+        previousPrice: data.previousPrice || null,
+        officialUrl: data.officialUrl || null,
+        marketplaceUrl: data.marketplaceUrl || null,
         currency: data.currency,
         priority: data.priority,
         status: data.status,
@@ -171,9 +195,10 @@ export async function POST(req: NextRequest) {
         priceBreakdown: breakdownStr,
         locationState: data.locationState || null,
         locationCity: data.locationCity || null,
-        isManualOverride: data.isManualOverride,
+        isManualOverride: Boolean(data.manualOverride || data.isManualOverride),
         availability: data.availability,
         researchMetadata: metadataStr,
+        lastChecked: data.lastChecked ? new Date(data.lastChecked) : new Date(),
         checkedAt: new Date(),
       },
     });
@@ -185,7 +210,7 @@ export async function POST(req: NextRequest) {
           dreamId: newDream.id,
           price: newDream.finalPrice,
           currency: newDream.currency,
-          source: newDream.sourceName || 'Initial Grimoire Inscription',
+          source: newDream.verifiedSource || newDream.sourceName || 'Initial Grimoire Inscription',
           priceType: newDream.priceBreakdown ? 'ON_ROAD' : 'FINAL',
           confidence: newDream.priceConfidence,
           breakdown: newDream.priceBreakdown,

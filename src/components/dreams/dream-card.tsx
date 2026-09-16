@@ -22,6 +22,7 @@ import {
   MapPin,
   ShieldCheck,
   Edit3,
+  Store,
 } from 'lucide-react';
 
 interface DreamCardProps {
@@ -60,9 +61,21 @@ export const DreamCard: React.FC<DreamCardProps> = ({
   const confConfig = CONFIDENCE_CONFIG[confidence] || CONFIDENCE_CONFIG.VERIFIED;
 
   const isVehicle = dream.category === 'Vehicles' || Boolean(dream.priceBreakdown);
+  const isManual = Boolean(dream.manualOverride || dream.isManualOverride);
+
   const locationText = dream.locationState
     ? `${dream.locationCity ? `${dream.locationCity}, ` : ''}${dream.locationState}`
     : undefined;
+
+  const sourcePill =
+    dream.verifiedSource ||
+    (dream.sourceType === 'OFFICIAL'
+      ? 'Official'
+      : dream.sourceType === 'AMAZON'
+      ? 'Amazon'
+      : dream.sourceType === 'FLIPKART'
+      ? 'Flipkart'
+      : dream.sourceName);
 
   // 1. SMALL COMPACT CARD VARIANT
   if (variant === 'small') {
@@ -116,10 +129,17 @@ export const DreamCard: React.FC<DreamCardProps> = ({
           <div className="pt-1 border-t border-white/5 space-y-1.5">
             <div className="flex items-baseline justify-between">
               <div className="flex items-center gap-1">
-                <span className="text-xs text-slate-400">{isVehicle ? 'On-Road' : 'Target'}</span>
-                <span className={`text-[9px] px-1.5 py-0.2 rounded-full border ${confConfig.badgeClass}`}>
-                  {confConfig.label.charAt(0)}
-                </span>
+                <span className="text-xs text-slate-400">Final Price</span>
+                {sourcePill && (
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/5 text-slate-300 border border-white/10 font-mono truncate max-w-[80px]">
+                    {sourcePill}
+                  </span>
+                )}
+                {isManual && (
+                  <span className="text-[8px] px-1 rounded bg-blue-500/20 text-blue-300 font-bold">
+                    M
+                  </span>
+                )}
               </div>
               <span className="text-base font-extrabold text-amber-300 font-mono">
                 {formatCurrency(finalPrice, currency)}
@@ -243,13 +263,18 @@ export const DreamCard: React.FC<DreamCardProps> = ({
               <span className="font-semibold text-amber-400/90 tracking-wider uppercase">
                 {dream.brand || dream.category}
               </span>
+              {sourcePill && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-300 font-mono">
+                  {sourcePill}
+                </span>
+              )}
               <span className={`text-[10px] px-2 py-0.2 rounded-full font-bold border flex items-center gap-1 ${confConfig.badgeClass}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${confConfig.dotClass}`} />
                 {confConfig.label}
               </span>
-              {dream.isManualOverride && (
-                <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                  MANUAL
+              {isManual && (
+                <span className="text-[9px] px-2 py-0.2 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold">
+                  Manually Edited
                 </span>
               )}
             </div>
@@ -281,9 +306,11 @@ export const DreamCard: React.FC<DreamCardProps> = ({
         {/* Financial Progress Box (Big Dream Finance) */}
         <div className="p-4 rounded-2xl bg-[#0a0d16]/80 border border-white/5 space-y-2.5">
           <div className="flex items-baseline justify-between">
-            <span className="text-xs font-medium text-slate-400">
-              {isVehicle ? 'On-Road Target Goal' : 'Target Goal'}
-            </span>
+            <div className="space-y-0.5">
+              <span className="text-xs font-bold text-amber-400/90 uppercase tracking-wider">
+                {isVehicle ? 'Final On-Road Price' : 'Final Price to Own'}
+              </span>
+            </div>
             <div className="flex items-baseline gap-2">
               {dream.listedPrice > finalPrice && (
                 <span className="text-xs text-slate-500 line-through">

@@ -26,7 +26,19 @@ const updateDreamSchema = z.object({
   isCurrentQuest: z.boolean().optional(),
   datePurchased: z.string().datetime().optional().nullable(),
   
-  // Phase 4 fields
+  // Universal Final Price Engine additions
+  verifiedSource: z.string().optional().nullable(),
+  sourceType: z.string().optional().nullable(),
+  lastChecked: z.string().datetime().optional().nullable(),
+  shippingCost: z.number().min(0).optional(),
+  mandatoryFees: z.number().min(0).optional(),
+  finalCheckoutPrice: z.number().min(0).optional(),
+  manualOverride: z.boolean().optional(),
+  previousPrice: z.number().optional().nullable(),
+  officialUrl: z.string().optional().nullable(),
+  marketplaceUrl: z.string().optional().nullable(),
+
+  // Price Engine fields
   priceConfidence: z.enum(['VERIFIED', 'ESTIMATED', 'NEEDS_CONFIRMATION']).optional(),
   priceBreakdown: z.union([z.string(), z.record(z.unknown())]).optional().nullable(),
   locationState: z.string().optional().nullable(),
@@ -111,7 +123,9 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 
     // Check if price changed manually
     const priceChanged = data.finalPrice !== undefined && data.finalPrice !== existingDream.finalPrice;
-    const isManual = data.isManualOverride !== undefined ? data.isManualOverride : (priceChanged ? true : existingDream.isManualOverride);
+    const isManual = data.manualOverride !== undefined
+      ? data.manualOverride
+      : (data.isManualOverride !== undefined ? data.isManualOverride : (priceChanged ? true : existingDream.manualOverride));
 
     // If price changed, save a history snapshot of the previous price
     if (priceChanged && existingDream.finalPrice > 0) {
@@ -120,7 +134,7 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
           dreamId: id,
           price: existingDream.finalPrice,
           currency: existingDream.currency,
-          source: existingDream.sourceName || 'Manual Edit Snapshot',
+          source: existingDream.verifiedSource || existingDream.sourceName || 'Manual Edit Snapshot',
           priceType: existingDream.priceBreakdown ? 'ON_ROAD' : 'FINAL',
           confidence: existingDream.priceConfidence,
           breakdown: existingDream.priceBreakdown,
@@ -136,9 +150,13 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
         priceBreakdown: breakdownStr,
         researchMetadata: metadataStr,
         isManualOverride: isManual,
+        manualOverride: isManual,
+        previousPrice: priceChanged ? existingDream.finalPrice : existingDream.previousPrice,
+        finalCheckoutPrice: data.finalCheckoutPrice !== undefined ? data.finalCheckoutPrice : (data.finalPrice !== undefined ? data.finalPrice : existingDream.finalCheckoutPrice),
         targetDate: data.targetDate ? new Date(data.targetDate) : data.targetDate === null ? null : undefined,
         datePurchased: data.datePurchased ? new Date(data.datePurchased) : data.datePurchased === null ? null : undefined,
         checkedAt: data.checkedAt ? new Date(data.checkedAt) : undefined,
+        lastChecked: data.lastChecked ? new Date(data.lastChecked) : undefined,
       },
       include: {
         priceHistory: {

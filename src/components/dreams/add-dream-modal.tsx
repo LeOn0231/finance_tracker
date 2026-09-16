@@ -11,6 +11,7 @@ import {
   PriceConfidence,
   PriceBreakdown,
   CONFIDENCE_CONFIG,
+  SourceType,
 } from '@/lib/types';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,8 @@ import {
   Edit3,
   ShieldCheck,
   CheckCircle2,
+  Truck,
+  Store,
 } from 'lucide-react';
 
 interface AddDreamModalProps {
@@ -66,15 +69,21 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
   const [status, setStatus] = useState<DreamStatus>('DREAMING');
   const [listedPrice, setListedPrice] = useState<string>('0');
   const [finalPrice, setFinalPrice] = useState<string>('0');
+  const [shippingCost, setShippingCost] = useState<string>('0');
+  const [mandatoryFees, setMandatoryFees] = useState<string>('0');
   const [amountSaved, setAmountSaved] = useState<string>('0');
   const [image, setImage] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
+  const [officialUrl, setOfficialUrl] = useState('');
+  const [marketplaceUrl, setMarketplaceUrl] = useState('');
   const [sourceName, setSourceName] = useState('');
+  const [verifiedSource, setVerifiedSource] = useState('');
+  const [sourceType, setSourceType] = useState<SourceType>('OFFICIAL');
   const [specs, setSpecs] = useState('');
   const [notes, setNotes] = useState('');
   const [isCurrentQuest, setIsCurrentQuest] = useState(false);
 
-  // Phase 4 states
+  // Price Engine states
   const [priceConfidence, setPriceConfidence] = useState<PriceConfidence>('VERIFIED');
   const [priceBreakdown, setPriceBreakdown] = useState<PriceBreakdown | null>(null);
   const [locationState, setLocationState] = useState<string>('');
@@ -97,10 +106,16 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
       setStatus(initialData.status || 'DREAMING');
       setListedPrice(String(initialData.listedPrice || 0));
       setFinalPrice(String(initialData.finalPrice || initialData.listedPrice || 0));
+      setShippingCost(String(initialData.shippingCost || 0));
+      setMandatoryFees(String(initialData.mandatoryFees || 0));
       setAmountSaved(String(initialData.amountSaved || 0));
       setImage(initialData.image || '');
       setSourceUrl(initialData.sourceUrl || '');
+      setOfficialUrl(initialData.officialUrl || '');
+      setMarketplaceUrl(initialData.marketplaceUrl || '');
       setSourceName(initialData.sourceName || '');
+      setVerifiedSource(initialData.verifiedSource || '');
+      setSourceType((initialData.sourceType as SourceType) || 'OFFICIAL');
       setSpecs(initialData.specs || '');
       setNotes(initialData.notes || '');
       setIsCurrentQuest(Boolean(initialData.isCurrentQuest));
@@ -121,7 +136,7 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
       }
       setLocationState(initialData.locationState || '');
       setLocationCity(initialData.locationCity || '');
-      setIsManualOverride(Boolean(initialData.isManualOverride));
+      setIsManualOverride(Boolean(initialData.manualOverride || initialData.isManualOverride));
       setActiveTab('MANUAL');
     } else {
       // Reset form
@@ -135,10 +150,16 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
       setStatus('DREAMING');
       setListedPrice('0');
       setFinalPrice('0');
+      setShippingCost('0');
+      setMandatoryFees('0');
       setAmountSaved('0');
       setImage('');
       setSourceUrl('');
+      setOfficialUrl('');
+      setMarketplaceUrl('');
       setSourceName('');
+      setVerifiedSource('');
+      setSourceType('OFFICIAL');
       setSpecs('');
       setNotes('');
       setIsCurrentQuest(false);
@@ -165,11 +186,17 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
     if (p.category) setCategory(p.category);
     if (p.image) setImage(p.image);
     if (p.sourceUrl) setSourceUrl(p.sourceUrl);
+    if (p.officialUrl) setOfficialUrl(p.officialUrl);
+    if (p.marketplaceUrl) setMarketplaceUrl(p.marketplaceUrl);
     if (p.sourceName) setSourceName(p.sourceName);
+    if (p.verifiedSource) setVerifiedSource(p.verifiedSource);
+    if (p.sourceType) setSourceType(p.sourceType);
     if (p.specs) setSpecs(p.specs);
 
     setListedPrice(String(p.listedPrice));
     setFinalPrice(String(p.finalPrice));
+    setShippingCost(String(p.shippingCost || 0));
+    setMandatoryFees(String(p.mandatoryFees || 0));
     setPriceConfidence(p.priceConfidence);
     if (p.priceBreakdown) setPriceBreakdown(p.priceBreakdown);
     if (p.locationState) setLocationState(p.locationState);
@@ -203,6 +230,8 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
 
     const listed = parseFloat(listedPrice) || 0;
     const final_ = parseFloat(finalPrice) || listed || 0;
+    const ship = parseFloat(shippingCost) || 0;
+    const fees = parseFloat(mandatoryFees) || 0;
     const saved = parseFloat(amountSaved) || 0;
 
     setIsSubmitting(true);
@@ -218,10 +247,17 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
         status,
         listedPrice: listed,
         finalPrice: final_,
+        finalCheckoutPrice: final_,
+        shippingCost: ship,
+        mandatoryFees: fees,
         amountSaved: saved,
         image: image.trim() || null,
         sourceUrl: sourceUrl.trim() || null,
+        officialUrl: officialUrl.trim() || null,
+        marketplaceUrl: marketplaceUrl.trim() || null,
         sourceName: sourceName.trim() || null,
+        verifiedSource: verifiedSource.trim() || null,
+        sourceType,
         specs: specs.trim() || null,
         notes: notes.trim() || null,
         isCurrentQuest,
@@ -231,6 +267,7 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
         locationState: locationState || null,
         locationCity: locationCity || null,
         isManualOverride,
+        manualOverride: isManualOverride,
       });
       onClose();
     } catch (err: unknown) {
@@ -256,7 +293,7 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
       subtitle={
         isEditing
           ? 'Modify your target goals, specs, price breakdown, or attributes.'
-          : 'Scry products with automated pricing or inscribe manual quest parameters.'
+          : 'Scry products from trusted sources with automated pricing or inscribe manual quest parameters.'
       }
     >
       <div className="space-y-6">
@@ -273,7 +310,7 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
               }`}
             >
               <Sparkles className="w-4 h-4" />
-              🔮 Akashic Product Scryer (Automated)
+              🔮 Akashic Product Scryer (Trusted Sources)
             </button>
             <button
               type="button"
@@ -307,6 +344,12 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
                 <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${confInfo.badgeClass}`}>
                   {confInfo.label}
                 </span>
+                {verifiedSource && (
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/25 flex items-center gap-1 font-semibold">
+                    <Store className="w-3 h-3 text-amber-400" />
+                    {verifiedSource}
+                  </span>
+                )}
                 {isManualOverride && (
                   <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 flex items-center gap-1 font-semibold">
                     <Edit3 className="w-3 h-3" />
@@ -343,7 +386,7 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
                       setName(e.target.value);
                       setIsManualOverride(true);
                     }}
-                    placeholder="e.g. Royal Enfield Super Meteor 650"
+                    placeholder="e.g. Logitech G Pro X Superlight 2"
                     required
                   />
                 </div>
@@ -359,7 +402,7 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
                         setBrand(e.target.value);
                         setIsManualOverride(true);
                       }}
-                      placeholder="e.g. Royal Enfield"
+                      placeholder="e.g. Logitech"
                     />
                   </div>
 
@@ -393,7 +436,7 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
                     <Input
                       value={model}
                       onChange={(e) => setModel(e.target.value)}
-                      placeholder="e.g. Super Meteor 650"
+                      placeholder="e.g. Superlight 2"
                     />
                   </div>
                   <div>
@@ -403,7 +446,7 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
                     <Input
                       value={variant}
                       onChange={(e) => setVariant(e.target.value)}
-                      placeholder="e.g. Stellar Marine Blue"
+                      placeholder="e.g. White Edition"
                     />
                   </div>
                 </div>
@@ -511,8 +554,8 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
                 {/* Price Row */}
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                      Final Target (₹) *
+                    <label className="block text-xs font-semibold text-amber-300 uppercase tracking-wider mb-1.5">
+                      Final Price (₹) *
                     </label>
                     <Input
                       type="number"
@@ -523,13 +566,13 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
                         setIsManualOverride(true);
                       }}
                       placeholder="0"
-                      icon={<DollarSign className="w-3.5 h-3.5" />}
+                      icon={<DollarSign className="w-3.5 h-3.5 text-amber-400" />}
                       required
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                      Listed/MSRP (₹)
+                      Listed (₹)
                     </label>
                     <Input
                       type="number"
@@ -558,6 +601,35 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
                   </div>
                 </div>
 
+                {/* Shipping & Fees Breakdown */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <Truck className="w-3 h-3 text-slate-400" />
+                      Shipping Cost (₹)
+                    </label>
+                    <Input
+                      type="number"
+                      step="any"
+                      value={shippingCost}
+                      onChange={(e) => setShippingCost(e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                      Platform Fees (₹)
+                    </label>
+                    <Input
+                      type="number"
+                      step="any"
+                      value={mandatoryFees}
+                      onChange={(e) => setMandatoryFees(e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+
                 {/* Image URL with live preview thumbnail */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
@@ -581,12 +653,12 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                      Source Store / Site
+                      Source Site / Store
                     </label>
                     <Input
                       value={sourceName}
                       onChange={(e) => setSourceName(e.target.value)}
-                      placeholder="e.g. Royal Enfield Official"
+                      placeholder="e.g. Logitech Official / Amazon"
                     />
                   </div>
                   <div>
@@ -611,7 +683,7 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
                   <textarea
                     value={specs}
                     onChange={(e) => setSpecs(e.target.value)}
-                    placeholder="e.g. 648cc engine, 47 BHP, Celestial Blue, Touring Seat..."
+                    placeholder="e.g. HERO 2 Sensor, 60g weight, LIGHTFORCE switches..."
                     rows={2}
                     className="w-full bg-[#0d101a]/90 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/20"
                   />
@@ -625,7 +697,7 @@ export const AddDreamModal: React.FC<AddDreamModalProps> = ({
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="e.g. Motivation for saving..."
+                    placeholder="e.g. Motivation for acquiring..."
                     rows={2}
                     className="w-full bg-[#0d101a]/90 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/20"
                   />

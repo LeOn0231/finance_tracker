@@ -23,6 +23,8 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
+import { ThemeProvider } from '@/lib/theme-context';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -31,8 +33,11 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="antialiased bg-[#090b10] text-slate-100 min-h-screen selection:bg-amber-500/30 selection:text-amber-200">
-        {children}
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
 }
+

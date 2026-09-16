@@ -24,6 +24,9 @@ import {
   ChevronUp,
   Flame,
   ArrowRight,
+  Store,
+  Truck,
+  Receipt,
 } from 'lucide-react';
 
 interface ScryingConsoleProps {
@@ -31,7 +34,13 @@ interface ScryingConsoleProps {
   onOpenExisting?: (dreamId: string) => void;
 }
 
-type ScryingStage = 'IDLE' | 'IDENTIFYING' | 'CHECKING_SOURCES' | 'CHECKING_PRICE' | 'CALCULATING_COST' | 'READY';
+type ScryingStage =
+  | 'IDLE'
+  | 'IDENTIFYING'
+  | 'CHECKING_SOURCES'
+  | 'CHECKING_PRICE'
+  | 'CALCULATING_COST'
+  | 'READY';
 
 export const ScryingConsole: React.FC<ScryingConsoleProps> = ({
   onApplyResult,
@@ -47,10 +56,10 @@ export const ScryingConsole: React.FC<ScryingConsoleProps> = ({
 
   const stageDescriptions: Record<ScryingStage, string> = {
     IDLE: 'Awaiting your command...',
-    IDENTIFYING: '🌀 Scanning Akashic Grimoire (Identifying item)...',
-    CHECKING_SOURCES: '🌐 Consulting Official Guilds & Manufacturers (Checking sources)...',
-    CHECKING_PRICE: '🏷️ Extracting Merchant Rates (Checking current price)...',
-    CALCULATING_COST: '⚖️ Balancing Royal Taxes & Statutory Fees (Calculating final cost)...',
+    IDENTIFYING: '🌀 Scanning Akashic Grimoire (Identifying product & model)...',
+    CHECKING_SOURCES: '🌐 Consulting Official Brands, Amazon India & Flipkart (Checking trusted sources)...',
+    CHECKING_PRICE: '🏷️ Extracting Verified Merchant Selling Rates (Checking current price)...',
+    CALCULATING_COST: '⚖️ Calculating Shipping, Mandatory Platform Fees & On-Road Taxes (Calculating final cost)...',
     READY: '✨ Scrying Complete!',
   };
 
@@ -65,10 +74,10 @@ export const ScryingConsole: React.FC<ScryingConsoleProps> = ({
     try {
       // Anime stage progression
       setStage('IDENTIFYING');
-      await new Promise((r) => setTimeout(r, 250));
+      await new Promise((r) => setTimeout(r, 200));
 
       setStage('CHECKING_SOURCES');
-      await new Promise((r) => setTimeout(r, 250));
+      await new Promise((r) => setTimeout(r, 200));
 
       setStage('CHECKING_PRICE');
       
@@ -86,7 +95,7 @@ export const ScryingConsole: React.FC<ScryingConsoleProps> = ({
       });
 
       setStage('CALCULATING_COST');
-      await new Promise((r) => setTimeout(r, 200));
+      await new Promise((r) => setTimeout(r, 150));
 
       if (!res.ok) {
         throw new Error('Research failed to retrieve product details');
@@ -96,7 +105,10 @@ export const ScryingConsole: React.FC<ScryingConsoleProps> = ({
 
       if (!data.success || !data.product) {
         setStage('IDLE');
-        setError(data.error || 'Unable to verify this information automatically. You can proceed with manual entry.');
+        setError(
+          data.error ||
+            'Unable to verify this information automatically from trusted sources. You can proceed with manual entry.'
+        );
         return;
       }
 
@@ -125,13 +137,16 @@ export const ScryingConsole: React.FC<ScryingConsoleProps> = ({
   return (
     <div className="space-y-4">
       {/* Search Bar Input */}
-      <div className="p-4 rounded-2xl bg-gradient-to-b from-[#0e1322] to-[#0a0d16] border border-amber-500/30 shadow-2xl space-y-3">
-        <div className="flex items-center justify-between">
+      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-b from-[#0e1322] to-[#0a0d16] border border-amber-500/30 shadow-2xl space-y-3.5">
+        <div className="flex items-center justify-between flex-wrap gap-1">
           <label className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
             <Sparkles className="w-4 h-4 text-amber-400" />
-            Akashic Product Scryer
+            Akashic Universal Final Price Engine
           </label>
-          <span className="text-[11px] text-slate-400">URL, Model Name, or Description</span>
+          <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
+            <ShieldCheck className="w-3 h-3 text-emerald-400" />
+            <span>Trusted Sources: Official Brands &bull; Amazon India &bull; Flipkart</span>
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2">
@@ -139,7 +154,7 @@ export const ScryingConsole: React.FC<ScryingConsoleProps> = ({
             <Input
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
-              placeholder="e.g. Royal Enfield Super Meteor 650 Stellar Marine Blue or paste URL..."
+              placeholder="e.g. Logitech G Pro X Superlight 2, Razer DeathAdder V3 Pro, Sony WH-1000XM6, Nike Air Force 1, or paste URL..."
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
@@ -159,7 +174,7 @@ export const ScryingConsole: React.FC<ScryingConsoleProps> = ({
             className="sm:w-auto w-full"
           >
             <Sparkles className="w-4 h-4 mr-1.5" />
-            Scry Dream
+            Scry Price
           </Button>
         </div>
 
@@ -167,7 +182,7 @@ export const ScryingConsole: React.FC<ScryingConsoleProps> = ({
         <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-white/5 text-xs text-slate-400">
           <div className="flex items-center gap-1.5">
             <MapPin className="w-3.5 h-3.5 text-purple-400" />
-            <span className="font-semibold text-slate-300">Vehicle On-Road Location:</span>
+            <span className="font-semibold text-slate-300">Vehicle On-Road State:</span>
           </div>
           <select
             value={selectedState}
@@ -194,7 +209,7 @@ export const ScryingConsole: React.FC<ScryingConsoleProps> = ({
               {stageDescriptions[stage]}
             </h4>
             <p className="text-xs text-slate-400 pt-1">
-              Extracting OEM rates, calculating statutory fees & verifying duplicate records...
+              Cross-referencing Official OEM rates, calculating shipping & platform fees...
             </p>
           </div>
         </div>
@@ -205,7 +220,7 @@ export const ScryingConsole: React.FC<ScryingConsoleProps> = ({
         <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium space-y-1">
           <div className="flex items-center gap-1.5 font-bold">
             <AlertTriangle className="w-4 h-4 text-rose-400" />
-            <span>Research Scrying Notice</span>
+            <span>Verification Notice</span>
           </div>
           <p>{error}</p>
         </div>
@@ -243,7 +258,7 @@ export const ScryingConsole: React.FC<ScryingConsoleProps> = ({
                 Open Existing Quest
               </Button>
             )}
-            <span className="text-[11px] text-slate-400 self-center">or continue below if this is a different variant</span>
+            <span className="text-[11px] text-slate-400 self-center">or continue below if this is a different trim</span>
           </div>
         </div>
       )}
@@ -258,12 +273,12 @@ export const ScryingConsole: React.FC<ScryingConsoleProps> = ({
                 {confConfig.label}
               </span>
               <span className="text-xs text-slate-400">
-                {confConfig.sublabel}
+                {product.verifiedSource || product.sourceName || 'Trusted Source'}
               </span>
             </div>
 
             <div className="text-[11px] text-slate-400 font-mono">
-              Checked {new Date(product.checkedAt).toLocaleTimeString()}
+              Checked Today
             </div>
           </div>
 
@@ -278,7 +293,7 @@ export const ScryingConsole: React.FC<ScryingConsoleProps> = ({
               />
             </div>
 
-            <div className="sm:col-span-8 space-y-2">
+            <div className="sm:col-span-8 space-y-2.5">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold text-amber-400/90 tracking-wider uppercase">
                   {product.brand || product.category}
@@ -300,20 +315,38 @@ export const ScryingConsole: React.FC<ScryingConsoleProps> = ({
                 </p>
               )}
 
-              {/* Price comparison */}
-              <div className="p-3 rounded-xl bg-[#090c14] border border-white/5 flex items-baseline justify-between">
-                <span className="text-xs text-slate-400">
-                  {product.priceBreakdown ? 'Final On-Road Price' : 'Verified Price to Own'}
-                </span>
-                <div className="flex items-baseline gap-2">
-                  {product.listedPrice !== product.finalPrice && (
-                    <span className="text-xs text-slate-500 line-through">
-                      {formatCurrency(product.listedPrice, product.currency)}
-                    </span>
-                  )}
-                  <span className="text-xl font-extrabold text-amber-300 font-mono">
-                    {formatCurrency(product.finalPrice, product.currency)}
+              {/* Universal Final Price Preview Box */}
+              <div className="p-3.5 rounded-xl bg-[#090c14] border border-amber-500/30 space-y-2">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                    {product.priceBreakdown?.type === 'VEHICLE_ON_ROAD' ? 'Final On-Road Price:' : 'Final Price to Own:'}
                   </span>
+                  <div className="text-2xl font-black text-amber-300 font-mono">
+                    {formatCurrency(product.finalPrice, product.currency)}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5 text-[11px] font-mono text-slate-300">
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">Listed:</span>
+                    <span className="font-bold">{formatCurrency(product.listedPrice, product.currency)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">Shipping:</span>
+                    <span className="font-bold">
+                      {product.shippingCost && product.shippingCost > 0
+                        ? formatCurrency(product.shippingCost, product.currency)
+                        : '₹0 (Free)'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">Platform Fees:</span>
+                    <span className="font-bold">
+                      {product.mandatoryFees && product.mandatoryFees > 0
+                        ? formatCurrency(product.mandatoryFees, product.currency)
+                        : '₹0'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

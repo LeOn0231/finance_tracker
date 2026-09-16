@@ -4,8 +4,11 @@ import { db } from '@/lib/db';
 import { verifyPassword, createSessionToken, setSessionCookie, ensureAdminUser } from '@/lib/auth';
 
 const loginSchema = z.object({
-  identifier: z.string().min(1, 'Username or email is required'),
+  identifier: z.string().optional(),
+  username: z.string().optional(),
   password: z.string().min(1, 'Password is required'),
+}).refine((data) => Boolean(data.identifier || data.username), {
+  message: 'Username or email is required',
 });
 
 export async function POST(req: NextRequest) {
@@ -20,7 +23,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { identifier, password } = result.data;
+    const identifier = (result.data.identifier || result.data.username || '').trim();
+    const { password } = result.data;
 
     // Ensure initial admin user exists
     await ensureAdminUser();

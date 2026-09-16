@@ -29,10 +29,10 @@ export async function POST(
 
     const previousPrice = dream.finalPrice;
 
-    // Run research service on the dream's url or name
+    // Run research service on the dream's url, brand/model, or name
     const researchResult = await researchService.research({
       query: dream.name,
-      url: dream.sourceUrl || undefined,
+      url: dream.sourceUrl || dream.officialUrl || dream.marketplaceUrl || undefined,
       locationState: dream.locationState || undefined,
       locationCity: dream.locationCity || undefined,
     });
@@ -50,6 +50,7 @@ export async function POST(
     const product = researchResult.product;
     const newFinalPrice = product.finalPrice;
     const diff = newFinalPrice - previousPrice;
+    const now = new Date();
 
     // 1. Record historical price entry
     await db.priceHistory.create({
@@ -57,28 +58,38 @@ export async function POST(
         dreamId: dream.id,
         price: previousPrice,
         currency: dream.currency,
-        source: dream.sourceName || 'Previous Log',
+        source: dream.verifiedSource || dream.sourceName || 'Previous Log',
         priceType: 'FINAL',
         confidence: dream.priceConfidence,
         breakdown: dream.priceBreakdown,
-        notes: `Recorded prior to market price refresh (${diff >= 0 ? '+' : ''}${diff.toLocaleString()})`,
+        notes: `Recorded prior to trusted price refresh (${diff >= 0 ? '+' : ''}${diff.toLocaleString()})`,
       },
     });
 
-    // 2. Update the dream record
+    // 2. Update the dream record with Universal Final Price Engine data
     const updatedDream = await db.dreamPurchase.update({
       where: { id: dream.id },
       data: {
         listedPrice: product.listedPrice,
         finalPrice: newFinalPrice,
+        finalCheckoutPrice: product.finalCheckoutPrice || newFinalPrice,
+        shippingCost: product.shippingCost || 0,
+        mandatoryFees: product.mandatoryFees || 0,
+        verifiedSource: product.verifiedSource || dream.verifiedSource,
+        sourceType: product.sourceType || dream.sourceType || 'OFFICIAL',
+        lastChecked: now,
+        previousPrice: previousPrice,
         priceConfidence: product.priceConfidence,
         priceBreakdown: product.priceBreakdown ? JSON.stringify(product.priceBreakdown) : dream.priceBreakdown,
         locationState: product.locationState || dream.locationState,
         locationCity: product.locationCity || dream.locationCity,
-        checkedAt: new Date(),
+        checkedAt: now,
         isManualOverride: false,
+        manualOverride: false,
         specs: product.specs || dream.specs,
         image: dream.image || product.image,
+        officialUrl: product.officialUrl || dream.officialUrl,
+        marketplaceUrl: product.marketplaceUrl || dream.marketplaceUrl,
       },
       include: {
         priceHistory: {
@@ -94,6 +105,8 @@ export async function POST(
       currentPrice: newFinalPrice,
       diff,
       priceConfidence: product.priceConfidence,
+      verifiedSource: updatedDream.verifiedSource,
+      lastChecked: updatedDream.lastChecked,
       checkedAt: updatedDream.checkedAt,
     });
   } catch (error) {

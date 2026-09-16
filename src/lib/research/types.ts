@@ -39,8 +39,15 @@ export interface ProductResearchResult {
     image?: string;
     sourceUrl?: string;
     sourceName?: string;
+    verifiedSource?: string;
+    sourceType?: 'OFFICIAL' | 'AMAZON' | 'FLIPKART' | 'MANUAL';
+    officialUrl?: string;
+    marketplaceUrl?: string;
     listedPrice: number;
+    shippingCost?: number;
+    mandatoryFees?: number;
     finalPrice: number;
+    finalCheckoutPrice?: number;
     currency: string;
     specs?: string;
     availability?: 'IN_STOCK' | 'OUT_OF_STOCK' | 'PRE_ORDER' | 'UNKNOWN';
@@ -49,6 +56,7 @@ export interface ProductResearchResult {
     locationState?: string;
     locationCity?: string;
     checkedAt: string;
+    lastChecked?: string;
     researchMetadata?: Record<string, unknown>;
   };
   sourcesChecked: ResearchSourceInfo[];

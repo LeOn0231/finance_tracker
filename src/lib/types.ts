@@ -214,6 +214,8 @@ export const CONFIDENCE_CONFIG: Record<PriceConfidence, ConfidenceInfo> = {
   },
 };
 
+export type SourceType = 'OFFICIAL' | 'AMAZON' | 'FLIPKART' | 'MANUAL';
+
 export interface PriceComponent {
   name: string;
   amount: number;
@@ -222,11 +224,16 @@ export interface PriceComponent {
 }
 
 export interface PriceBreakdown {
-  type: 'STANDARD' | 'VEHICLE_ON_ROAD';
+  type: 'STANDARD' | 'VEHICLE_ON_ROAD' | 'ELECTRONICS' | 'APPAREL' | 'COLLECTIBLE';
   currency: string;
-  listedPrice: number; // e.g. MSRP, Ex-Showroom
-  finalPrice: number; // Listed + Taxes + Fees + Mandatory charges
+  listedPrice: number; // e.g. MSRP, Selling Price, Ex-Showroom
+  shippingCost?: number;
+  mandatoryFees?: number;
+  finalPrice: number; // Listed + Shipping + Fees + Mandatory charges
   components: PriceComponent[];
+  sourceType?: SourceType;
+  verifiedSource?: string;
+  lastChecked?: string;
   location?: {
     state: string;
     city?: string;
@@ -270,7 +277,19 @@ export interface DreamPurchaseItem {
   specs?: string | null;
   isCurrentQuest: boolean;
   
-  // Phase 4 Extensions
+  // Universal Final Price Engine Extensions
+  verifiedSource?: string | null;
+  sourceType?: SourceType | string | null;
+  lastChecked?: string | Date | null;
+  shippingCost?: number;
+  mandatoryFees?: number;
+  finalCheckoutPrice?: number;
+  manualOverride?: boolean;
+  previousPrice?: number | null;
+  officialUrl?: string | null;
+  marketplaceUrl?: string | null;
+
+  // Product Research & Price Engine extensions
   priceConfidence: PriceConfidence;
   priceBreakdown?: PriceBreakdown | string | null;
   locationState?: string | null;

@@ -3,7 +3,7 @@
 import React from 'react';
 import { PriceBreakdown } from '@/lib/types';
 import { formatCurrency } from '@/lib/finance-calculator';
-import { ShieldCheck, MapPin, Calculator, Layers, AlertCircle } from 'lucide-react';
+import { ShieldCheck, MapPin, Calculator, Store, Truck, Info } from 'lucide-react';
 
 interface PriceBreakdownCardProps {
   breakdown: PriceBreakdown | string | null | undefined;
@@ -36,6 +36,25 @@ export const PriceBreakdownCard: React.FC<PriceBreakdownCardProps> = ({
   }
 
   const isVehicle = breakdown.type === 'VEHICLE_ON_ROAD';
+  const isElectronics = breakdown.type === 'ELECTRONICS';
+  const isApparel = breakdown.type === 'APPAREL';
+
+  const titleText = isVehicle
+    ? 'On-Road Price Breakdown'
+    : isElectronics
+    ? 'Electronics & Peripheral Cost Breakdown'
+    : isApparel
+    ? 'Apparel & Footwear Payable Breakdown'
+    : 'Itemized Cost Breakdown';
+
+  const subtitleText = isVehicle
+    ? 'Statutory state RTO registration, comprehensive insurance & road safety charges'
+    : isElectronics
+    ? 'Verified selling price, insured delivery & mandatory platform handling charges'
+    : isApparel
+    ? 'Payable checkout total with doorstep delivery fee calculation'
+    : 'Verified retail components to calculate exact total amount required to own';
+
   const locationText = breakdown.location
     ? `${breakdown.location.city ? `${breakdown.location.city}, ` : ''}${breakdown.location.state}`
     : undefined;
@@ -52,12 +71,10 @@ export const PriceBreakdownCard: React.FC<PriceBreakdownCardProps> = ({
           </div>
           <div>
             <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-              {isVehicle ? 'On-Road Price Breakdown' : 'Itemized Cost Breakdown'}
+              {titleText}
             </h4>
             <p className="text-[11px] text-slate-400">
-              {isVehicle
-                ? 'Accurate Indian statutory registration, RTO & comprehensive insurance'
-                : 'Verified retail components'}
+              {subtitleText}
             </p>
           </div>
         </div>
@@ -108,11 +125,11 @@ export const PriceBreakdownCard: React.FC<PriceBreakdownCardProps> = ({
       <div className="pt-3 border-t border-white/10 flex items-baseline justify-between">
         <div className="space-y-0.5">
           <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
-            {isVehicle ? 'Final On-Road Price' : 'Total Price to Own'}
+            {isVehicle ? 'Final On-Road Price' : 'Final Price to Own'}
           </span>
           <p className="text-[10px] text-slate-400 flex items-center gap-1">
             <ShieldCheck className="w-3 h-3 text-emerald-400" />
-            Exact reconciliation ($Total = \sum Components$)
+            Exact reconciliation total
           </p>
         </div>
         <div className="text-right">

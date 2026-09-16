@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { DreamPurchaseItem, CONFIDENCE_CONFIG, PriceConfidence } from '@/lib/types';
+import { DreamPurchaseItem, CONFIDENCE_CONFIG, PriceConfidence, PriceBreakdown } from '@/lib/types';
 import { formatCurrency } from '@/lib/finance-calculator';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { PriorityBadge } from '@/components/ui/priority-badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { SafeImage } from '@/components/ui/safe-image';
@@ -31,6 +32,10 @@ import {
   TrendingDown,
   ShieldCheck,
   AlertCircle,
+  Truck,
+  Receipt,
+  Store,
+  Sparkles,
 } from 'lucide-react';
 
 interface DreamDetailModalProps {
@@ -63,25 +68,84 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
   } | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
 
+  // Manual Override editing state
+  const [isOverriding, setIsOverriding] = useState(false);
+  const [overridePriceInput, setOverridePriceInput] = useState('');
+  const [isSavingOverride, setIsSavingOverride] = useState(false);
+
   // Keep local state in sync with prop changes
   React.useEffect(() => {
     setDream(initialDream);
     setRefreshDelta(null);
     setRefreshError(null);
+    setIsOverriding(false);
+    if (initialDream) {
+      setOverridePriceInput(String(initialDream.finalPrice || initialDream.listedPrice || 0));
+    }
   }, [initialDream, isOpen]);
 
   if (!dream) return null;
 
   const finalPrice = dream.finalPrice || dream.listedPrice || 0;
   const listedPrice = dream.listedPrice || finalPrice;
+  const shippingCost = dream.shippingCost || 0;
+  const mandatoryFees = dream.mandatoryFees || 0;
   const amountSaved = dream.amountSaved || 0;
   const progressPercent = Math.min(100, Math.round((amountSaved / (finalPrice || 1)) * 100));
-  const discount = listedPrice > finalPrice ? listedPrice - finalPrice : 0;
   const currency = dream.currency || 'INR';
+
+  // Parse breakdown if available
+  let parsedBreakdown: PriceBreakdown | null = null;
+  if (dream.priceBreakdown) {
+    if (typeof dream.priceBreakdown === 'string') {
+      try {
+        parsedBreakdown = JSON.parse(dream.priceBreakdown);
+      } catch {
+        parsedBreakdown = null;
+      }
+    } else {
+      parsedBreakdown = dream.priceBreakdown;
+    }
+  }
 
   // Price Confidence
   const confidence: PriceConfidence = (dream.priceConfidence as PriceConfidence) || 'VERIFIED';
   const confConfig = CONFIDENCE_CONFIG[confidence] || CONFIDENCE_CONFIG.VERIFIED;
+
+  // Source attribution display
+  const verifiedSourceDisplay =
+    dream.verifiedSource ||
+    parsedBreakdown?.verifiedSource ||
+    dream.sourceName ||
+    (dream.sourceType === 'OFFICIAL'
+      ? 'Official Brand Website'
+      : dream.sourceType === 'AMAZON'
+      ? 'Amazon India'
+      : dream.sourceType === 'FLIPKART'
+      ? 'Flipkart'
+      : 'Verified Retailer');
+
+  // Compute Checked Date display ("Today", "Yesterday", or formatted date)
+  const formatCheckedDate = (dateVal?: string | Date | null) => {
+    if (!dateVal) return 'Today';
+    const d = new Date(dateVal);
+    const now = new Date();
+    const isToday =
+      d.getDate() === now.getDate() &&
+      d.getMonth() === now.getMonth() &&
+      d.getFullYear() === now.getFullYear();
+    if (isToday) return 'Today';
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday =
+      d.getDate() === yesterday.getDate() &&
+      d.getMonth() === yesterday.getMonth() &&
+      d.getFullYear() === yesterday.getFullYear();
+    if (isYesterday) return 'Yesterday';
+    return d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const checkedDisplay = formatCheckedDate(dream.lastChecked || dream.checkedAt);
 
   // Compute days since dream was added
   const addedDate = new Date(dream.dateAdded);
@@ -104,11 +168,12 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to refresh price');
+        throw new Error(data.error || 'Failed to refresh price from trusted source.');
       }
 
       if (data.dream) {
         setDream(data.dream);
+        setOverridePriceInput(String(data.dream.finalPrice));
         if (onDreamUpdated) {
           onDreamUpdated(data.dream);
         }
@@ -120,11 +185,58 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
         sounds.playTierUp();
       }
     } catch (err: unknown) {
-      setRefreshError(err instanceof Error ? err.message : 'Market price check failed');
+      setRefreshError(err instanceof Error ? err.message : 'Market price verification failed');
     } finally {
       setIsRefreshing(false);
     }
   };
+
+  // Handle Manual Override Save
+  const handleSaveManualOverride = async () => {
+    if (!dream) return;
+    const newPrice = parseFloat(overridePriceInput);
+    if (isNaN(newPrice) || newPrice < 0) {
+      setRefreshError('Please enter a valid price number.');
+      return;
+    }
+
+    setIsSavingOverride(true);
+    setRefreshError(null);
+    sounds.playClick();
+
+    try {
+      const res = await fetch(`/api/dreams/${dream.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          finalPrice: newPrice,
+          finalCheckoutPrice: newPrice,
+          manualOverride: true,
+          isManualOverride: true,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save manual override.');
+      }
+
+      if (data.dream) {
+        setDream(data.dream);
+        setIsOverriding(false);
+        if (onDreamUpdated) {
+          onDreamUpdated(data.dream);
+        }
+        sounds.playChime();
+      }
+    } catch (err: unknown) {
+      setRefreshError(err instanceof Error ? err.message : 'Failed to update price override');
+    } finally {
+      setIsSavingOverride(false);
+    }
+  };
+
+  const isManual = Boolean(dream.manualOverride || dream.isManualOverride);
 
   const locationText = dream.locationState
     ? `${dream.locationCity ? `${dream.locationCity}, ` : ''}${dream.locationState}`
@@ -149,7 +261,7 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
               <div>
-                <span className="font-bold text-white">Market Price Verified: </span>
+                <span className="font-bold text-white">Trusted Source Verified: </span>
                 <span className="text-slate-300">
                   Previous {formatCurrency(refreshDelta.previousPrice, currency)} &rarr; Current{' '}
                   <strong className="text-amber-300 font-mono">
@@ -172,7 +284,7 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
                 ? `+${formatCurrency(refreshDelta.diff, currency)}`
                 : refreshDelta.diff < 0
                 ? `-${formatCurrency(Math.abs(refreshDelta.diff), currency)}`
-                : 'No change'}
+                : 'No price change'}
             </div>
           </div>
         )}
@@ -220,10 +332,10 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
                 <span className={`w-1.5 h-1.5 rounded-full ${confConfig.dotClass}`} />
                 {confConfig.label}
               </span>
-              {dream.isManualOverride && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 flex items-center gap-1 font-semibold">
+              {isManual && (
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 flex items-center gap-1 font-bold tracking-wide">
                   <Edit3 className="w-2.5 h-2.5" />
-                  MANUAL
+                  Manually Edited
                 </span>
               )}
             </div>
@@ -236,6 +348,11 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
               {dream.brand && (
                 <p className="font-bold text-amber-400/90 uppercase tracking-wider">
                   Brand: <span className="text-slate-200">{dream.brand}</span>
+                </p>
+              )}
+              {dream.model && (
+                <p className="text-slate-400">
+                  Model: <span className="text-slate-200 font-semibold">{dream.model}</span>
                 </p>
               )}
               {dream.variant && (
@@ -251,32 +368,134 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
               )}
             </div>
 
-            {/* Price Box */}
-            <div className="p-3.5 rounded-xl bg-[#0b0e18] border border-white/10 space-y-2">
-              <div className="flex items-baseline justify-between">
-                <span className="text-xs text-slate-400">
-                  {dream.priceBreakdown ? 'Final On-Road Value:' : 'Target Value:'}
-                </span>
-                <div className="flex items-baseline gap-2">
-                  {discount > 0 && (
-                    <span className="text-xs text-slate-500 line-through">
-                      {formatCurrency(listedPrice, currency)}
+            {/* ------------------------------------------------------------------ */}
+            {/* UNIVERSAL FINAL PRICE HERO BOX (REQUIRED SPECIFICATION) */}
+            {/* ------------------------------------------------------------------ */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-b from-[#0e1424] to-[#0a0d18] border border-amber-500/35 shadow-2xl space-y-3.5">
+              <div className="flex items-start justify-between flex-wrap gap-2">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black tracking-widest text-amber-400 uppercase flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      FINAL PRICE
                     </span>
-                  )}
-                  <span className="text-xl font-extrabold text-amber-300 font-mono">
+                    {isManual && (
+                      <span className="text-[10px] px-2 py-0.2 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/40 font-bold">
+                        Manually Edited
+                      </span>
+                    )}
+                  </div>
+
+                  {/* LARGEST NUMBER ON THE PAGE */}
+                  <div className="text-3xl sm:text-4xl font-black text-amber-300 font-mono tracking-tight pt-0.5">
                     {formatCurrency(finalPrice, currency)}
-                  </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsOverriding(!isOverriding)}
+                    className="p-1.5 rounded-lg text-xs font-medium bg-white/5 hover:bg-blue-500/20 text-slate-400 hover:text-blue-300 border border-white/10 transition-colors flex items-center gap-1"
+                    title="Manually override final price"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Override</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRefreshPrice}
+                    disabled={isRefreshing}
+                    className="p-1.5 rounded-lg text-xs font-medium bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-all flex items-center gap-1"
+                    title="Refresh current price from trusted source"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    <span className="hidden sm:inline">{isRefreshing ? 'Checking...' : 'Refresh'}</span>
+                  </button>
                 </div>
               </div>
 
-              {discount > 0 && (
-                <div className="flex items-center justify-between text-xs text-emerald-400 font-medium pt-1 border-t border-white/5">
-                  <span>Price Advantage:</span>
-                  <span>-{formatCurrency(discount, currency)} savings</span>
+              {/* Manual Override Input Form */}
+              {isOverriding && (
+                <div className="p-3 rounded-xl bg-[#070a12] border border-blue-500/40 space-y-2 animate-fadeIn">
+                  <div className="flex items-center justify-between text-xs text-blue-300 font-semibold">
+                    <span>Edit Final Amount (₹)</span>
+                    <span className="text-[11px] text-slate-400">Original verified baseline preserved</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      step="any"
+                      value={overridePriceInput}
+                      onChange={(e) => setOverridePriceInput(e.target.value)}
+                      placeholder="Enter custom final price..."
+                      className="text-sm font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleSaveManualOverride}
+                      isLoading={isSavingOverride}
+                    >
+                      Save
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => setIsOverriding(false)}
+                      className="px-2.5 py-1 text-xs text-slate-400 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {/* Progress Bar */}
+              {/* SPECIFICATION SUB-BREAKDOWN BOX */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-3 border-t border-white/10 text-xs font-mono">
+                <div className="p-2 rounded-xl bg-white/[0.02] border border-white/5 space-y-0.5">
+                  <span className="text-[10px] text-slate-400 font-sans uppercase">Listed:</span>
+                  <div className="font-bold text-slate-200">
+                    {formatCurrency(listedPrice, currency)}
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-xl bg-white/[0.02] border border-white/5 space-y-0.5">
+                  <span className="text-[10px] text-slate-400 font-sans uppercase">Shipping:</span>
+                  <div className="font-bold text-slate-200">
+                    {shippingCost > 0 ? formatCurrency(shippingCost, currency) : '₹0 (Free)'}
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-xl bg-white/[0.02] border border-white/5 space-y-0.5">
+                  <span className="text-[10px] text-slate-400 font-sans uppercase">Fees:</span>
+                  <div className="font-bold text-slate-200">
+                    {mandatoryFees > 0 ? formatCurrency(mandatoryFees, currency) : '₹0'}
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-xl bg-white/[0.02] border border-white/5 space-y-0.5 col-span-2 sm:col-span-2">
+                  <span className="text-[10px] text-slate-400 font-sans uppercase flex items-center gap-1">
+                    <Store className="w-3 h-3 text-amber-400" />
+                    Source:
+                  </span>
+                  <div className="font-bold text-amber-300 font-sans truncate" title={verifiedSourceDisplay}>
+                    {verifiedSourceDisplay}
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-xl bg-white/[0.02] border border-white/5 space-y-0.5">
+                  <span className="text-[10px] text-slate-400 font-sans uppercase flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-slate-400" />
+                    Checked:
+                  </span>
+                  <div className="font-bold text-slate-200 font-sans">
+                    {checkedDisplay}
+                  </div>
+                </div>
+              </div>
+
+              {/* Savings Progress Bar */}
               {dream.status !== 'PURCHASED' && (
                 <div className="space-y-1.5 pt-1">
                   <div className="flex justify-between text-[11px] text-slate-400 font-mono">
@@ -295,7 +514,7 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
           </div>
         </div>
 
-        {/* Price Breakdown Section (if vehicle or structured components exist) */}
+        {/* Detailed Itemized / Vehicle Cost Breakdown Section */}
         {dream.priceBreakdown && (
           <PriceBreakdownCard breakdown={dream.priceBreakdown} currency={currency} />
         )}
@@ -346,7 +565,7 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
           <div className="flex items-center gap-1.5 col-span-2">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
             <span>
-              Checked: {dream.checkedAt ? new Date(dream.checkedAt).toLocaleDateString() : 'Initial'}
+              Source Verified: {verifiedSourceDisplay} ({checkedDisplay})
             </span>
           </div>
           {dream.datePurchased && (
@@ -360,7 +579,31 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/10">
           <div className="flex items-center gap-2 flex-wrap">
-            {dream.sourceUrl && (
+            {dream.officialUrl && (
+              <a
+                href={dream.officialUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/25 transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Official Brand Site
+              </a>
+            )}
+
+            {dream.marketplaceUrl && (
+              <a
+                href={dream.marketplaceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                Marketplace Listing
+              </a>
+            )}
+
+            {dream.sourceUrl && !dream.officialUrl && !dream.marketplaceUrl && (
               <a
                 href={dream.sourceUrl}
                 target="_blank"
@@ -378,7 +621,7 @@ export const DreamDetailModal: React.FC<DreamDetailModalProps> = ({
               onClick={handleRefreshPrice}
               disabled={isRefreshing}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-all"
-              title="Researches current rates and updates price history"
+              title="Re-fetches current price from trusted source and logs trajectory"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
               {isRefreshing ? 'Checking...' : 'Refresh Price'}

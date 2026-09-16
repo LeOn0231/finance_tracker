@@ -43,6 +43,18 @@ model DreamPurchase {
   specs               String?               // JSON formatted or plain text specifications
   isCurrentQuest      Boolean               @default(false)
   
+  // Universal Final Price Engine additions
+  verifiedSource      String?               // e.g. "Official Website", "Amazon India", "Flipkart"
+  sourceType          String?               @default("OFFICIAL") // OFFICIAL, AMAZON, FLIPKART, MANUAL
+  lastChecked         DateTime?             @default(now())
+  shippingCost        Float                 @default(0)
+  mandatoryFees       Float                 @default(0)
+  finalCheckoutPrice  Float                 @default(0)
+  manualOverride      Boolean               @default(false)
+  previousPrice       Float?
+  officialUrl         String?
+  marketplaceUrl      String?
+
   // Phase 4: Product Research & Price Engine extensions
   priceConfidence     String                @default("VERIFIED") // VERIFIED, ESTIMATED, NEEDS_CONFIRMATION
   priceBreakdown      String?               // JSON string of PriceBreakdown
