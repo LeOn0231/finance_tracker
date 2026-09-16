@@ -1,11 +1,12 @@
 // Prisma Schema for Life Quest - Private Personal Quest & Finance Tracker
+// Configured for MySQL Production & Local Development
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -28,8 +29,8 @@ model DreamPurchase {
   variant             String?
   category            String                @default("General") // Vehicles, Electronics, Collectibles, Gaming, Fashion, Books/Manga, Audio, Other
   type                String                @default("BIG_DREAM") // BIG_DREAM, SMALL_DREAM
-  image               String?
-  sourceUrl           String?
+  image               String?               @db.Text
+  sourceUrl           String?               @db.Text
   sourceName          String?
   listedPrice         Float                 @default(0)
   finalPrice          Float                 @default(0)
@@ -39,8 +40,8 @@ model DreamPurchase {
   amountSaved         Float                 @default(0)
   monthlyContribution Float                 @default(0) // Monthly allocation from savings
   targetDate          DateTime?             // Target completion date for Big Dreams
-  notes               String?
-  specs               String?               // JSON formatted or plain text specifications
+  notes               String?               @db.Text
+  specs               String?               @db.Text
   isCurrentQuest      Boolean               @default(false)
   
   // Universal Final Price Engine additions
@@ -52,18 +53,18 @@ model DreamPurchase {
   finalCheckoutPrice  Float                 @default(0)
   manualOverride      Boolean               @default(false)
   previousPrice       Float?
-  officialUrl         String?
-  marketplaceUrl      String?
+  officialUrl         String?               @db.Text
+  marketplaceUrl      String?               @db.Text
 
-  // Phase 4: Product Research & Price Engine extensions
+  // Product Research & Price Engine extensions
   priceConfidence     String                @default("VERIFIED") // VERIFIED, ESTIMATED, NEEDS_CONFIRMATION
-  priceBreakdown      String?               // JSON string of PriceBreakdown
+  priceBreakdown      String?               @db.Text
   locationState       String?               // e.g. "Karnataka", "Maharashtra", "Delhi"
   locationCity        String?               // e.g. "Bengaluru", "Mumbai"
   isManualOverride    Boolean               @default(false)
   checkedAt           DateTime?             @default(now())
   availability        String?               @default("IN_STOCK") // IN_STOCK, OUT_OF_STOCK, PRE_ORDER, UNKNOWN
-  researchMetadata    String?               // JSON string storing source attribution, raw metadata
+  researchMetadata    String?               @db.Text
 
   dateAdded           DateTime              @default(now())
   datePurchased       DateTime?
@@ -89,9 +90,9 @@ model PriceHistory {
   source      String?
   priceType   String        @default("FINAL") // LISTED, FINAL, ON_ROAD
   confidence  String        @default("VERIFIED") // VERIFIED, ESTIMATED, NEEDS_CONFIRMATION
-  breakdown   String?       // JSON snapshot of components at recorded time
+  breakdown   String?       @db.Text // JSON snapshot of components at recorded time
   recordedAt  DateTime      @default(now())
-  notes       String?
+  notes       String?       @db.Text
   createdAt   DateTime      @default(now())
 
   dream       DreamPurchase @relation(fields: [dreamId], references: [id], onDelete: Cascade)
@@ -110,7 +111,7 @@ model FinancialMonth {
   safetyBuffer  Float     @default(0)
   dreamBudget   Float     @default(0) // Optional dedicated monthly dream budget
   currency      String    @default("INR")
-  notes         String?
+  notes         String?   @db.Text
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -146,7 +147,7 @@ model SavingsAllocation {
   amount           Float           @default(0)
   linkedDreamId    String?
   financialMonthId String
-  notes            String?
+  notes            String?         @db.Text
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
@@ -169,7 +170,7 @@ model Expense {
   isPaid           Boolean         @default(false)
   linkedDreamId    String?
   financialMonthId String?
-  notes            String?
+  notes            String?         @db.Text
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
@@ -189,7 +190,7 @@ model PurchaseTransaction {
   amount           Float           @default(0)
   linkedDreamId    String?
   financialMonthId String?
-  notes            String?
+  notes            String?         @db.Text
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
@@ -205,8 +206,8 @@ model Achievement {
   id          String    @id @default(cuid())
   code        String    @unique
   title       String
-  description String
-  icon        String?
+  description String    @db.Text
+  icon        String?   @db.Text
   category    String    @default("DREAM") // DREAM, FINANCE, SAVINGS, SECRET
   unlockedAt  DateTime?
   progress    Float     @default(0)

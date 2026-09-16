@@ -13,6 +13,7 @@ Life Quest bridges the gap between ambitious personal desires (vehicles, compute
 - An **Anime RPG UI System** with 8 curated themes, sound effects, achievements, and dynamic auras.
 - A **Strict Personal Finance Engine** that computes real-time **Available Money** and **Safe-to-Spend** cash flow with safety buffer protections.
 - An **Idempotent Purchase & Celebration Experience** with fanfare, confetti, and automated achievement evaluations.
+- A **Pure MySQL Architecture** completely independent and decoupled from any external or corporate infrastructure.
 
 ---
 
@@ -70,32 +71,53 @@ Life Quest bridges the gap between ambitious personal desires (vehicles, compute
 ## 🏛️ Architecture & Tech Stack
 
 ```
-┌────────────────────────────────────────────────────────┐
-│               Next.js 15 App Router                   │
-│   (React 19, Tailwind CSS, Web Audio, Confetti)        │
-└───────────┬────────────────────────────────┬───────────┘
-            │                                │
-┌───────────▼───────────┐        ┌───────────▼───────────┐
-│     API Routes        │        │   Middleware Guard    │
-│  (/api/dreams, /auth) │        │  (JWT Session Verify) │
-└───────────┬───────────┘        └───────────┬───────────┘
-            │                                │
-┌───────────▼───────────┐        ┌───────────▼───────────┐
-│ Universal Price Engine│        │    Finance Engine     │
-│  (Calculators/Sources)│        │   (Available / Safe)  │
-└───────────┬───────────┘        └───────────┬───────────┘
-            │                                │
-┌───────────▼────────────────────────────────▼───────────┐
-│                       Prisma ORM                       │
-│     (SQLite for local dev / PostgreSQL in prod)        │
-└────────────────────────────────────────────────────────┘
+                 INTERNET
+                    │
+                    ▼
+             ┌─────────────┐
+             │   Vercel    │
+             │ Life Quest  │
+             └──────┬──────┘
+                    │
+                    ▼
+             Server/API Layer
+                    │
+                    ▼
+             ┌─────────────┐
+             │   Managed   │
+             │    MySQL    │
+             └─────────────┘
 ```
 
 - **Framework**: [Next.js 15](https://nextjs.org/) (App Router, Server Components & Route Handlers)
 - **Frontend**: React 19, TypeScript, Tailwind CSS, Lucide Icons
-- **Database**: [Prisma 5.22](https://www.prisma.io/) (SQLite default, PostgreSQL ready)
+- **Database**: [Prisma 5.22](https://www.prisma.io/) with **MySQL** Engine
 - **Authentication**: Stateless Signed JWT via [`jose`](https://github.com/panva/jose) + [`bcryptjs`](https://github.com/dcodeIO/bcrypt.js)
 - **Audio & FX**: Synthesized Web Audio API, Canvas Confetti
+
+---
+
+## 🐬 MySQL Database Configuration
+
+Life Quest is powered natively by **MySQL 8.0+** using UTF8MB4 charset for comprehensive unicode/emoji support and explicit `@db.Text` annotations for large text schemas.
+
+### 1. Local MySQL via Docker Compose (Isolated)
+Run an independent local MySQL container:
+```bash
+docker compose up -d
+```
+Connection string for local development:
+```env
+DATABASE_URL="mysql://quest_admin:QuestSecret2025!@localhost:3306/lifequest"
+```
+
+### 2. Managed MySQL in Production (Recommended Providers)
+Life Quest connects seamlessly to any managed MySQL instance supporting TLS/SSL:
+- **Aiven for MySQL**: Managed MySQL with automated backups and SSL (`sslmode=REQUIRED`).
+- **PlanetScale**: Serverless MySQL with branch management.
+- **Railway / Render MySQL**: Standalone managed MySQL instances.
+- **AWS RDS MySQL / DigitalOcean Managed MySQL**: Standard enterprise MySQL 8.0.
+- **TiDB Serverless**: MySQL-compatible cloud database.
 
 ---
 
@@ -131,10 +153,11 @@ Life Quest enforces a strict trusted-sources whitelist for product pricing:
 Create a `.env` file in the root directory based on `.env.example`:
 
 ```env
-# Database Connection (SQLite for local run, PostgreSQL for production)
-DATABASE_URL="file:./dev.db"
+# Database Connection (MySQL)
+DATABASE_URL="mysql://quest_admin:QuestSecret2025!@localhost:3306/lifequest"
 
 # Admin Authentication Secret (32+ char random string)
+# Generate with: openssl rand -base64 32
 AUTH_SECRET="your-secure-random-32-character-secret-key"
 
 # Initial Admin User Credentials
@@ -156,19 +179,24 @@ NEXT_PUBLIC_DEFAULT_CURRENCY="INR"
 npm install
 ```
 
-### 2. Configure Database & Seed Initial Data
+### 2. Start Local MySQL Database
+```bash
+docker compose up -d
+```
+
+### 3. Push Schema & Seed Initial Data
 ```bash
 npm run db:push
 npm run db:seed
 ```
 
-### 3. Run Dev Server
+### 4. Run Dev Server
 ```bash
 npm run dev
 ```
 Access the application at **http://localhost:3000** (or port specified in terminal).
 
-### 4. Default Login Credentials
+### 5. Default Login Credentials
 - **Username / Email**: `admin` or `admin@lifequest.local`
 - **Password**: `ChangeMeQuest2025!`
 
@@ -179,8 +207,8 @@ Access the application at **http://localhost:3000** (or port specified in termin
 Run the test suite and production build:
 
 ```bash
-# Run automated comprehensive audit test suite (37/37 checks)
-node scratch/test_phase7_audit.js
+# Generate Prisma Client
+npm run db:generate
 
 # TypeScript validation
 npm run typecheck
@@ -194,34 +222,34 @@ npm run build
 
 ---
 
-## 🚢 Deployment Guide
+## 🚢 Production Deployment Guide (Vercel + Managed MySQL)
 
-Life Quest is production-ready for deployment to platforms like **Vercel**, **Railway**, or **Render**.
+### Step 1: Provision Managed MySQL Database
+Create a clean MySQL 8.0 database on your chosen provider (e.g. Aiven, PlanetScale, Railway, AWS RDS). Note the connection string:
+```
+mysql://USER:PASSWORD@HOST:PORT/DATABASE?sslaccept=strict
+```
 
-### Recommended Architecture:
-- **Application Hosting**: Vercel (Next.js App Router)
-- **Database**: Managed PostgreSQL (Supabase, Neon, AWS RDS, Railway)
+### Step 2: Push Database Schema
+From your local environment or deployment CI/CD:
+```bash
+DATABASE_URL="mysql://USER:PASSWORD@HOST:PORT/DATABASE?sslaccept=strict" npx prisma db push
+DATABASE_URL="mysql://USER:PASSWORD@HOST:PORT/DATABASE?sslaccept=strict" npx tsx prisma/seed.ts
+```
 
-### Deployment Steps (Vercel + Supabase/Neon PostgreSQL):
-1. In `prisma/schema.prisma`, update `datasource db` provider to `"postgresql"`:
-   ```prisma
-   datasource db {
-     provider = "postgresql"
-     url      = env("DATABASE_URL")
-   }
-   ```
-2. In your Vercel Project Settings, add the Environment Variables:
-   - `DATABASE_URL`: `postgresql://USER:PASSWORD@HOST:PORT/DB?sslmode=require`
-   - `AUTH_SECRET`: Random 32+ character production string (`openssl rand -base64 32`)
-   - `ADMIN_USERNAME`: Your private username
-   - `ADMIN_EMAIL`: Your private email
-   - `ADMIN_INITIAL_PASSWORD`: Strong master password
-   - `NEXT_PUBLIC_DEFAULT_CURRENCY`: `INR` (or `USD`, `EUR`, `GBP`, `JPY`)
-3. Deploy the application:
-   ```bash
-   npx prisma migrate deploy
-   vercel --prod
-   ```
+### Step 3: Configure Vercel Project
+In your Vercel Project Settings $\to$ **Environment Variables**, configure:
+- `DATABASE_URL`: `mysql://USER:PASSWORD@HOST:PORT/DATABASE?sslaccept=strict`
+- `AUTH_SECRET`: Strong 32+ character key (`openssl rand -base64 32`)
+- `ADMIN_USERNAME`: Your private username
+- `ADMIN_EMAIL`: Your private email
+- `ADMIN_INITIAL_PASSWORD`: Strong master password
+- `NEXT_PUBLIC_DEFAULT_CURRENCY`: `INR` (or `USD`, `EUR`, `GBP`, `JPY`)
+
+### Step 4: Deploy
+```bash
+vercel --prod
+```
 
 ---
 
